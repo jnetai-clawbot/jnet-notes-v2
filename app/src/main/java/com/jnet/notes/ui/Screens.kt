@@ -1,6 +1,6 @@
 package com.jnet.notes.ui
 
-import androidx.compose.foundation.layout.*
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.material.*
@@ -24,12 +24,11 @@ fun NoteListScreen(repository: NotesRepository, onNoteClick: (Int) -> Unit, onAd
                 Text("+")
             }
         }
-    ) {
-        LazyColumn(modifier = Modifier.fillMaxSize().padding(16.dp)) {
+    ) { paddingValues ->
+        LazyColumn(modifier = Modifier.fillMaxSize().padding(paddingValues).padding(16.dp)) {
             items(notes) { note ->
                 Card(
-                    modifier = Modifier.fillMaxWidth().padding(vertical = 8.dp),
-                    onClick = { onNoteClick(note.id) }
+                    modifier = Modifier.fillMaxWidth().padding(vertical = 8.dp).clickable { onNoteClick(note.id) }
                 ) {
                     Text(text = note.title, modifier = Modifier.padding(16.dp))
                 }
