@@ -29,6 +29,10 @@ class NotesRepository(
     }
 
     // --- Note Management ---
+    fun getAllNotes(): List<NoteEntity> {
+        return noteDao.getAllNotes()
+    }
+
     fun saveNote(title: String, content: String, password: String) {
         val user = userDao.getUser() ?: return
         val salt = Base64.getDecoder().decode(user.salt)
