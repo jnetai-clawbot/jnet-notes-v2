@@ -4,6 +4,8 @@ import com.jnet.notes.data.local.*
 import com.jnet.notes.data.remote.*
 import com.jnet.notes.security.EncryptionManager
 import java.util.Base64
+import com.google.gson.Gson
+import com.google.gson.reflect.TypeToken
 
 class NotesRepository(
     private val noteDao: NoteDao,
