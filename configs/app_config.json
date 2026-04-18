@@ -1,0 +1,7 @@
+{
+  "api_endpoint": "https://jnetai.com/apps/Notes/remote-notes.php",
+  "app_name": "JNetNotes",
+  "encryption_algorithm": "AES/GCM/NoPadding",
+  "hash_algorithm": "SHA-256",
+  "kdf": "PBKDF2WithHmacSHA256"
+}
