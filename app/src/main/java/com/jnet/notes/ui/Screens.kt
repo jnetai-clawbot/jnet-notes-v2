@@ -50,15 +50,16 @@ fun logError(code: String, msg: String, e: Throwable? = null) {
 
 @Composable
 fun NoteListScreen(
-    repository: NotesRepository, 
-    onNoteClick: (Int) -> Unit, 
+    repository: NotesRepository,
+    password: String,
+    onNoteClick: (Int) -> Unit,
     onAddNote: () -> Unit,
     onLogout: () -> Unit
 ) {
     var notes by remember { mutableStateOf(listOf<NoteEntity>()) }
     var loadError by remember { mutableStateOf("") }
     val scope = rememberCoroutineScope()
-    
+
     LaunchedEffect(Unit) {
         try {
             notes = withContext(Dispatchers.IO) { repository.getAllNotes() }
@@ -69,7 +70,7 @@ fun NoteListScreen(
     }
 
     Scaffold(
-        topBar = { 
+        topBar = {
             TopAppBar(
                 title = { Text("J~Net Notes") },
                 actions = {
@@ -125,6 +126,7 @@ fun NoteListScreen(
 @Composable
 fun NoteEditScreen(
     repository: NotesRepository,
+    password: String,
     noteId: Int?,
     onSave: () -> Unit,
     onCancel: () -> Unit
@@ -138,7 +140,7 @@ fun NoteEditScreen(
     var isLoading by remember { mutableStateOf(noteId != null) }
     var error by remember { mutableStateOf("") }
     var showDeleteConfirm by remember { mutableStateOf(false) }
-    
+
     // Load existing note if editing
     if (noteId != null && isLoading) {
         LaunchedEffect(noteId) {
@@ -147,9 +149,10 @@ fun NoteEditScreen(
                 val note = notes.find { it.id == noteId }
                 if (note != null) {
                     title = note.title
-                    content = note.encryptedContent // Will be decrypted later when password is integrated
+                    val decrypted = withContext(Dispatchers.IO) { repository.getDecryptedNote(note, password) }
+                    content = decrypted
                     originalTitle = note.title
-                    originalContent = note.encryptedContent
+                    originalContent = decrypted
                 }
             } catch (e: Exception) {
                 logError(Err.E006, "Failed to load note", e)
@@ -158,7 +161,7 @@ fun NoteEditScreen(
             isLoading = false
         }
     }
-    
+
     if (showDeleteConfirm) {
         AlertDialog(
             onDismissRequest = { showDeleteConfirm = false },
@@ -187,7 +190,7 @@ fun NoteEditScreen(
             }
         )
     }
-    
+
     Scaffold(
         topBar = {
             TopAppBar(
@@ -217,7 +220,7 @@ fun NoteEditScreen(
                     Text(error, color = MaterialTheme.colors.error, style = MaterialTheme.typography.body2)
                     Spacer(modifier = Modifier.height(8.dp))
                 }
-                
+
                 OutlinedTextField(
                     value = title,
                     onValueChange = { title = it },
@@ -226,7 +229,7 @@ fun NoteEditScreen(
                     singleLine = true
                 )
                 Spacer(modifier = Modifier.height(12.dp))
-                
+
                 OutlinedTextField(
                     value = content,
                     onValueChange = { content = it },
@@ -235,7 +238,7 @@ fun NoteEditScreen(
                     maxLines = Int.MAX_VALUE
                 )
                 Spacer(modifier = Modifier.height(16.dp))
-                
+
                 Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceEvenly) {
                     // Save button
                     Button(
@@ -247,7 +250,7 @@ fun NoteEditScreen(
                             scope.launch {
                                 try {
                                     withContext(Dispatchers.IO) {
-                                        repository.saveNote(title, content, "local")
+                                        repository.saveNote(title, content, password)
                                     }
                                     Toast.makeText(context, "Note saved", Toast.LENGTH_SHORT).show()
                                     onSave()
@@ -261,7 +264,7 @@ fun NoteEditScreen(
                     ) {
                         Text("Save")
                     }
-                    
+
                     // Revert button (only when editing)
                     if (noteId != null) {
                         OutlinedButton(
@@ -282,17 +285,17 @@ fun NoteEditScreen(
 }
 
 @Composable
-fun LoginScreen(userDao: UserDao, onLoginSuccess: () -> Unit) {
+fun LoginScreen(userDao: UserDao, onLoginSuccess: (String) -> Unit) {
     val context = LocalContext.current
     val scope = rememberCoroutineScope()
-    
+
     var password by remember { mutableStateOf("") }
     var newPassword by remember { mutableStateOf("") }
     var confirmPassword by remember { mutableStateOf("") }
     var isSetup by remember { mutableStateOf(false) }
     var checkedExisting by remember { mutableStateOf(false) }
     var error by remember { mutableStateOf("") }
-    
+
     LaunchedEffect(Unit) {
         try {
             withContext(Dispatchers.IO) {
@@ -305,14 +308,14 @@ fun LoginScreen(userDao: UserDao, onLoginSuccess: () -> Unit) {
         }
         checkedExisting = true
     }
-    
+
     if (!checkedExisting) {
         Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
             CircularProgressIndicator()
         }
         return
     }
-    
+
     Column(
         modifier = Modifier.fillMaxSize().padding(32.dp),
         verticalArrangement = Arrangement.Center,
@@ -333,7 +336,7 @@ fun LoginScreen(userDao: UserDao, onLoginSuccess: () -> Unit) {
                 color = MaterialTheme.colors.onSurface.copy(alpha = 0.7f)
             )
             Spacer(modifier = Modifier.height(24.dp))
-            
+
             OutlinedTextField(
                 value = password,
                 onValueChange = { password = it },
@@ -342,7 +345,7 @@ fun LoginScreen(userDao: UserDao, onLoginSuccess: () -> Unit) {
                 modifier = Modifier.fillMaxWidth()
             )
             Spacer(modifier = Modifier.height(8.dp))
-            
+
             OutlinedTextField(
                 value = newPassword,
                 onValueChange = { newPassword = it },
@@ -351,7 +354,7 @@ fun LoginScreen(userDao: UserDao, onLoginSuccess: () -> Unit) {
                 modifier = Modifier.fillMaxWidth()
             )
             Spacer(modifier = Modifier.height(8.dp))
-            
+
             OutlinedTextField(
                 value = confirmPassword,
                 onValueChange = { confirmPassword = it },
@@ -360,12 +363,12 @@ fun LoginScreen(userDao: UserDao, onLoginSuccess: () -> Unit) {
                 modifier = Modifier.fillMaxWidth()
             )
             Spacer(modifier = Modifier.height(16.dp))
-            
+
             if (error.isNotEmpty()) {
                 Text(error, color = MaterialTheme.colors.error, style = MaterialTheme.typography.body2)
                 Spacer(modifier = Modifier.height(8.dp))
             }
-            
+
             Button(
                 onClick = {
                     error = ""
@@ -381,7 +384,7 @@ fun LoginScreen(userDao: UserDao, onLoginSuccess: () -> Unit) {
                         error = "Passwords do not match"
                         return@Button
                     }
-                    
+
                     scope.launch {
                         try {
                             withContext(Dispatchers.IO) {
@@ -394,7 +397,7 @@ fun LoginScreen(userDao: UserDao, onLoginSuccess: () -> Unit) {
                                 ))
                             }
                             Toast.makeText(context, "Password set!", Toast.LENGTH_SHORT).show()
-                            onLoginSuccess()
+                            onLoginSuccess(newPassword)
                         } catch (e: Exception) {
                             logError(Err.E004, "Failed to save new password", e)
                             error = "${Err.E004}: ${e.message}"
@@ -408,7 +411,7 @@ fun LoginScreen(userDao: UserDao, onLoginSuccess: () -> Unit) {
         } else {
             Text("Unlock Notes", style = MaterialTheme.typography.h5)
             Spacer(modifier = Modifier.height(24.dp))
-            
+
             OutlinedTextField(
                 value = password,
                 onValueChange = { password = it },
@@ -417,12 +420,12 @@ fun LoginScreen(userDao: UserDao, onLoginSuccess: () -> Unit) {
                 modifier = Modifier.fillMaxWidth()
             )
             Spacer(modifier = Modifier.height(16.dp))
-            
+
             if (error.isNotEmpty()) {
                 Text(error, color = MaterialTheme.colors.error, style = MaterialTheme.typography.body2)
                 Spacer(modifier = Modifier.height(8.dp))
             }
-            
+
             Button(
                 onClick = {
                     error = ""
@@ -437,7 +440,7 @@ fun LoginScreen(userDao: UserDao, onLoginSuccess: () -> Unit) {
                                 } else false
                             }
                             if (match) {
-                                onLoginSuccess()
+                                onLoginSuccess(password)
                             } else {
                                 error = "Incorrect password"
                             }
@@ -457,7 +460,7 @@ fun LoginScreen(userDao: UserDao, onLoginSuccess: () -> Unit) {
 
 @Composable
 fun SettingsScreen(
-    currentTheme: Boolean, 
+    currentTheme: Boolean,
     onThemeToggle: (Boolean) -> Unit,
     onExport: () -> Unit,
     onImport: () -> Unit
@@ -465,17 +468,17 @@ fun SettingsScreen(
     Column(modifier = Modifier.fillMaxSize().padding(16.dp)) {
         Text("Settings", style = MaterialTheme.typography.h5)
         Spacer(modifier = Modifier.height(16.dp))
-        
+
         Row(verticalAlignment = Alignment.CenterVertically) {
             Text("Dark Theme")
             Spacer(modifier = Modifier.weight(1f))
             Switch(checked = currentTheme, onCheckedChange = onThemeToggle)
         }
-        
+
         Button(onClick = onExport, modifier = Modifier.fillMaxWidth().padding(vertical = 8.dp)) {
             Text("Export Local Backup (JSON)")
         }
-        
+
         Button(onClick = onImport, modifier = Modifier.fillMaxWidth().padding(vertical = 8.dp)) {
             Text("Import Backup File")
         }

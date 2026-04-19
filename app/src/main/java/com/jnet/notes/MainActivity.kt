@@ -31,19 +31,22 @@ class MainActivity : ComponentActivity() {
         val repository = NotesRepository(db.noteDao(), db.userDao(), api)
         
         setContent {
-            var isDark by remember { mutableStateOf(true) }
-            var unlocked by remember { mutableStateOf(false) }
             var currentScreen by remember { mutableStateOf("login") }
             var editingNoteId by remember { mutableStateOf<Int?>(null) }
+            var sessionPassword by remember { mutableStateOf("") }
             
-            JNetNotesTheme(darkTheme = isDark) {
+            JNetNotesTheme(darkTheme = true) {
                 when (currentScreen) {
                     "login" -> LoginScreen(
                         userDao = db.userDao(),
-                        onLoginSuccess = { currentScreen = "list" }
+                        onLoginSuccess = { password ->
+                            sessionPassword = password
+                            currentScreen = "list"
+                        }
                     )
                     "list" -> NoteListScreen(
                         repository = repository,
+                        password = sessionPassword,
                         onNoteClick = { id -> 
                             editingNoteId = id
                             currentScreen = "edit"
@@ -53,12 +56,13 @@ class MainActivity : ComponentActivity() {
                             currentScreen = "edit"
                         },
                         onLogout = { 
-                            unlocked = false
+                            sessionPassword = ""
                             currentScreen = "login"
                         }
                     )
                     "edit" -> NoteEditScreen(
                         repository = repository,
+                        password = sessionPassword,
                         noteId = editingNoteId,
                         onSave = { currentScreen = "list" },
                         onCancel = { currentScreen = "list" }
