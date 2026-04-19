@@ -67,6 +67,11 @@ class MainActivity : ComponentActivity() {
                         onSave = { currentScreen = "list" },
                         onCancel = { currentScreen = "list" }
                     )
+                    "settings" -> SettingsScreen(
+                        repository = repository,
+                        password = sessionPassword,
+                        onBack = { currentScreen = "list" }
+                    )
                 }
             }
         }

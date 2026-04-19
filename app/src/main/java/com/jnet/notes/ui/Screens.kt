@@ -13,8 +13,6 @@ import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
-import androidx.compose.ui.text.AnnotatedString
-import androidx.compose.ui.text.input.PasswordVisualTransformation
 import androidx.compose.ui.unit.dp
 import com.jnet.notes.repository.NotesRepository
 import com.jnet.notes.data.local.NoteEntity
@@ -28,6 +26,8 @@ import kotlinx.coroutines.withContext
 import kotlinx.coroutines.launch
 
 private const val TAG = "JNetNotes"
+private const val EXPORT_REQUEST = 1001
+private const val IMPORT_REQUEST = 1002
 
 object Err {
     const val E001 = "E001: DB_INIT_FAILED"
@@ -57,7 +57,8 @@ fun NoteListScreen(
     password: String,
     onNoteClick: (Int) -> Unit,
     onAddNote: () -> Unit,
-    onLogout: () -> Unit
+    onLogout: () -> Unit,
+    onSettings: () -> Unit
 ) {
     var notes by remember { mutableStateOf(listOf<NoteEntity>()) }
     var loadError by remember { mutableStateOf("") }
@@ -76,6 +77,11 @@ fun NoteListScreen(
         topBar = {
             TopAppBar(
                 title = { Text("J~Net Notes") },
+                navigationIcon = {
+                    TextButton(onClick = onSettings) {
+                        Text("☰", color = MaterialTheme.colors.onPrimary, style = MaterialTheme.typography.h5)
+                    }
+                },
                 actions = {
                     TextButton(onClick = onLogout) {
                         Text("Logout", color = MaterialTheme.colors.onPrimary)
@@ -243,7 +249,6 @@ fun NoteEditScreen(
                 Spacer(modifier = Modifier.height(16.dp))
 
                 Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceEvenly) {
-                    // Save button - updates if editing, creates new if new
                     Button(
                         onClick = {
                             if (title.isBlank()) {
@@ -253,7 +258,6 @@ fun NoteEditScreen(
                             scope.launch {
                                 try {
                                     withContext(Dispatchers.IO) {
-                                        // If editing, delete the old note first then save updated one
                                         if (noteId != null) {
                                             val notes = repository.getAllNotes()
                                             val oldNote = notes.find { it.id == noteId }
@@ -274,7 +278,6 @@ fun NoteEditScreen(
                         Text("Save")
                     }
 
-                    // Revert button (only when editing)
                     if (noteId != null) {
                         OutlinedButton(
                             onClick = {
@@ -291,7 +294,6 @@ fun NoteEditScreen(
 
                 Spacer(modifier = Modifier.height(8.dp))
 
-                // Copy and Share row
                 Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceEvenly) {
                     OutlinedButton(
                         onClick = {
@@ -357,7 +359,6 @@ fun LoginScreen(userDao: UserDao, onLoginSuccess: (String) -> Unit) {
         return
     }
 
-    // Wrap in Surface with dark background so login screen is dark themed
     Surface(color = MaterialTheme.colors.background) {
         Column(
             modifier = Modifier.fillMaxSize().padding(32.dp),
@@ -504,27 +505,125 @@ fun LoginScreen(userDao: UserDao, onLoginSuccess: (String) -> Unit) {
 
 @Composable
 fun SettingsScreen(
-    currentTheme: Boolean,
-    onThemeToggle: (Boolean) -> Unit,
-    onExport: () -> Unit,
-    onImport: () -> Unit
+    repository: NotesRepository,
+    password: String,
+    onBack: () -> Unit
 ) {
-    Column(modifier = Modifier.fillMaxSize().padding(16.dp)) {
-        Text("Settings", style = MaterialTheme.typography.h5)
-        Spacer(modifier = Modifier.height(16.dp))
+    val context = LocalContext.current
+    val scope = rememberCoroutineScope()
+    var statusMessage by remember { mutableStateOf("") }
+    var isExporting by remember { mutableStateOf(false) }
+    var isImporting by remember { mutableStateOf(false) }
 
-        Row(verticalAlignment = Alignment.CenterVertically) {
-            Text("Dark Theme")
-            Spacer(modifier = Modifier.weight(1f))
-            Switch(checked = currentTheme, onCheckedChange = onThemeToggle)
+    // Register activity result for import
+    val importLauncher = rememberLauncherForActivityResult(
+        contract = androidx.activity.result.contract.ActivityResultContracts.GetContent()
+    ) { uri ->
+        uri?.let {
+            isImporting = true
+            scope.launch {
+                try {
+                    val json = withContext(Dispatchers.IO) {
+                        context.contentResolver.openInputStream(uri)?.bufferedReader()?.readText()
+                            ?: throw Exception("Could not read file")
+                    }
+                    withContext(Dispatchers.IO) {
+                        repository.importNotesFromJson(json, password)
+                    }
+                    statusMessage = "Import complete!"
+                } catch (e: Exception) {
+                    logError(Err.E011, "Import failed", e)
+                    statusMessage = "${Err.E011}: ${e.message}"
+                }
+                isImporting = false
+            }
         }
+    }
 
-        Button(onClick = onExport, modifier = Modifier.fillMaxWidth().padding(vertical = 8.dp)) {
-            Text("Export Local Backup (JSON)")
+    Scaffold(
+        topBar = {
+            TopAppBar(
+                title = { Text("Settings") },
+                navigationIcon = {
+                    TextButton(onClick = onBack) {
+                        Text("← Back", color = MaterialTheme.colors.onPrimary)
+                    }
+                }
+            )
         }
+    ) { paddingValues ->
+        Column(modifier = Modifier.fillMaxSize().padding(paddingValues).padding(16.dp)) {
+            Text("Backup & Restore", style = MaterialTheme.typography.h6)
+            Spacer(modifier = Modifier.height(8.dp))
+            Text(
+                "Export saves encrypted notes. Import works with the same password.",
+                style = MaterialTheme.typography.body2,
+                color = MaterialTheme.colors.onSurface.copy(alpha = 0.6f)
+            )
+            Spacer(modifier = Modifier.height(16.dp))
 
-        Button(onClick = onImport, modifier = Modifier.fillMaxWidth().padding(vertical = 8.dp)) {
-            Text("Import Backup File")
+            // Export button
+            Button(
+                onClick = {
+                    isExporting = true
+                    statusMessage = ""
+                    scope.launch {
+                        try {
+                            val json = withContext(Dispatchers.IO) { repository.exportNotesToJson() }
+                            val fileName = "jnet-notes-backup-${java.text.SimpleDateFormat("yyyyMMdd-HHmmss", java.util.Locale.getDefault()).format(java.util.Date())}.json"
+                            val file = java.io.File(context.cacheDir, fileName)
+                            file.writeText(json)
+                            val uri = androidx.core.content.FileProvider.getUriForFile(
+                                context,
+                                "${context.packageName}.fileprovider",
+                                file
+                            )
+                            val shareIntent = Intent().apply {
+                                action = Intent.ACTION_SEND
+                                type = "application/json"
+                                putExtra(Intent.EXTRA_STREAM, uri)
+                                addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION)
+                            }
+                            context.startActivity(Intent.createChooser(shareIntent, "Export notes to..."))
+                            statusMessage = "Export ready — choose where to save"
+                        } catch (e: Exception) {
+                            logError(Err.E010, "Export failed", e)
+                            statusMessage = "${Err.E010}: ${e.message}"
+                        }
+                        isExporting = false
+                    }
+                },
+                modifier = Modifier.fillMaxWidth().padding(vertical = 8.dp),
+                enabled = !isExporting
+            ) {
+                if (isExporting) {
+                    CircularProgressIndicator(color = MaterialTheme.colors.onPrimary, modifier = Modifier.size(20.dp))
+                } else {
+                    Text("Export Encrypted Backup")
+                }
+            }
+
+            // Import button
+            OutlinedButton(
+                onClick = {
+                    statusMessage = ""
+                    importLauncher.launch("application/json")
+                },
+                modifier = Modifier.fillMaxWidth().padding(vertical = 8.dp),
+                enabled = !isImporting
+            ) {
+                if (isImporting) {
+                    CircularProgressIndicator(color = MaterialTheme.colors.onPrimary, modifier = Modifier.size(20.dp))
+                } else {
+                    Text("Import Encrypted Backup")
+                }
+            }
+
+            if (statusMessage.isNotEmpty()) {
+                Spacer(modifier = Modifier.height(16.dp))
+                val isError = statusMessage.startsWith("E")
+                Text(statusMessage, color = if (isError) MaterialTheme.colors.error else MaterialTheme.colors.primary)
+            }
         }
     }
 }
