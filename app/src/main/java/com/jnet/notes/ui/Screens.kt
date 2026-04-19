@@ -591,6 +591,33 @@ fun SettingsScreen(
                 val isError = statusMessage.startsWith("E")
                 Text(statusMessage, color = if (isError) MaterialTheme.colors.error else MaterialTheme.colors.primary)
             }
+
+            Spacer(modifier = Modifier.height(32.dp))
+            Divider()
+            Spacer(modifier = Modifier.height(16.dp))
+
+            // About section
+            Text("About", style = MaterialTheme.typography.h6)
+            Spacer(modifier = Modifier.height(8.dp))
+            Text("Secure Notes ©️ J~Net 2026", style = MaterialTheme.typography.body1)
+            Text("jnetai.com", style = MaterialTheme.typography.body2, color = MaterialTheme.colors.primary)
+            Spacer(modifier = Modifier.height(16.dp))
+
+            // Share App button
+            OutlinedButton(
+                onClick = {
+                    val shareIntent = Intent().apply {
+                        action = Intent.ACTION_SEND
+                        type = "text/plain"
+                        putExtra(Intent.EXTRA_SUBJECT, "J~Net Secure Notes App")
+                        putExtra(Intent.EXTRA_TEXT, "Check out J~Net Secure Notes — encrypted notes app for Android\nhttps://github.com/jnetai-clawbot/jnet-notes-v2/releases/latest")
+                    }
+                    context.startActivity(Intent.createChooser(shareIntent, "Share J~Net Notes via..."))
+                },
+                modifier = Modifier.fillMaxWidth().padding(vertical = 8.dp)
+            ) {
+                Text("Share App")
+            }
         }
     }
 }
