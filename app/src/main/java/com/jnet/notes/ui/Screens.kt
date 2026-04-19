@@ -21,6 +21,7 @@ import androidx.compose.runtime.getValue
 import androidx.compose.runtime.setValue
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
+import kotlinx.coroutines.launch
 
 @Composable
 fun NoteListScreen(repository: NotesRepository, onNoteClick: (Int) -> Unit, onAddNote: () -> Unit) {
