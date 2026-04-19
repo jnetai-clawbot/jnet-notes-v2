@@ -25,7 +25,12 @@ import kotlinx.coroutines.launch
 
 @Composable
 fun NoteListScreen(repository: NotesRepository, onNoteClick: (Int) -> Unit, onAddNote: () -> Unit) {
-    var notes by remember { mutableStateOf(repository.getAllNotes()) }
+    var notes by remember { mutableStateOf(listOf<NoteEntity>()) }
+    val scope = rememberCoroutineScope()
+    
+    LaunchedEffect(Unit) {
+        notes = withContext(Dispatchers.IO) { repository.getAllNotes() }
+    }
 
     Scaffold(
         topBar = { TopAppBar(title = { Text("J~Net Notes") }) },

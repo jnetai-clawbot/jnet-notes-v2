@@ -21,25 +21,25 @@ data class UserCredsEntity(
 @Dao
 interface NoteDao {
     @Query("SELECT * FROM notes ORDER BY timestamp DESC")
-    fun getAllNotes(): List<NoteEntity>
+    suspend fun getAllNotes(): List<NoteEntity>
 
     @Insert(onConflict = OnConflictStrategy.REPLACE)
-    fun insertNote(note: NoteEntity)
+    suspend fun insertNote(note: NoteEntity)
 
     @Delete
-    fun deleteNote(note: NoteEntity)
+    suspend fun deleteNote(note: NoteEntity)
 
     @Query("UPDATE notes SET syncStatus = :status WHERE id = :id")
-    fun updateSyncStatus(id: Int, status: Int)
+    suspend fun updateSyncStatus(id: Int, status: Int)
 }
 
 @Dao
 interface UserDao {
     @Query("SELECT * FROM user_creds WHERE id = 1")
-    fun getUser(): UserCredsEntity?
+    suspend fun getUser(): UserCredsEntity?
 
     @Insert(onConflict = OnConflictStrategy.REPLACE)
-    fun saveUser(user: UserCredsEntity)
+    suspend fun saveUser(user: UserCredsEntity)
 }
 
 @Database(entities = [NoteEntity::class, UserCredsEntity::class], version = 1)
