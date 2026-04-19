@@ -1,5 +1,7 @@
 package com.jnet.notes.ui
 
+import android.content.Context
+import android.content.Intent
 import android.widget.Toast
 import android.util.Log
 import androidx.compose.foundation.clickable
@@ -11,6 +13,7 @@ import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.text.AnnotatedString
 import androidx.compose.ui.text.input.PasswordVisualTransformation
 import androidx.compose.ui.unit.dp
 import com.jnet.notes.repository.NotesRepository
@@ -197,7 +200,7 @@ fun NoteEditScreen(
                 title = { Text(if (noteId == null) "New Note" else "Edit Note") },
                 navigationIcon = {
                     TextButton(onClick = onCancel) {
-                        Text("✕", color = MaterialTheme.colors.onPrimary, fontSize = MaterialTheme.typography.h6.fontSize)
+                        Text("Close", color = MaterialTheme.colors.onPrimary)
                     }
                 },
                 actions = {
@@ -240,7 +243,7 @@ fun NoteEditScreen(
                 Spacer(modifier = Modifier.height(16.dp))
 
                 Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceEvenly) {
-                    // Save button
+                    // Save button - updates if editing, creates new if new
                     Button(
                         onClick = {
                             if (title.isBlank()) {
@@ -250,6 +253,12 @@ fun NoteEditScreen(
                             scope.launch {
                                 try {
                                     withContext(Dispatchers.IO) {
+                                        // If editing, delete the old note first then save updated one
+                                        if (noteId != null) {
+                                            val notes = repository.getAllNotes()
+                                            val oldNote = notes.find { it.id == noteId }
+                                            if (oldNote != null) repository.deleteNote(oldNote)
+                                        }
                                         repository.saveNote(title, content, password)
                                     }
                                     Toast.makeText(context, "Note saved", Toast.LENGTH_SHORT).show()
@@ -277,6 +286,38 @@ fun NoteEditScreen(
                         ) {
                             Text("Revert")
                         }
+                    }
+                }
+
+                Spacer(modifier = Modifier.height(8.dp))
+
+                // Copy and Share row
+                Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceEvenly) {
+                    OutlinedButton(
+                        onClick = {
+                            val clipboard = context.getSystemService(Context.CLIPBOARD_SERVICE) as android.content.ClipboardManager
+                            val clip = android.content.ClipData.newPlainText("Note", "${title}\n\n${content}")
+                            clipboard.setPrimaryClip(clip)
+                            Toast.makeText(context, "Copied to clipboard", Toast.LENGTH_SHORT).show()
+                        },
+                        modifier = Modifier.weight(1f).padding(horizontal = 4.dp)
+                    ) {
+                        Text("Copy")
+                    }
+
+                    OutlinedButton(
+                        onClick = {
+                            val shareIntent = Intent().apply {
+                                action = Intent.ACTION_SEND
+                                putExtra(Intent.EXTRA_SUBJECT, title)
+                                putExtra(Intent.EXTRA_TEXT, "${title}\n\n${content}")
+                                type = "text/plain"
+                            }
+                            context.startActivity(Intent.createChooser(shareIntent, "Share note via..."))
+                        },
+                        modifier = Modifier.weight(1f).padding(horizontal = 4.dp)
+                    ) {
+                        Text("Share")
                     }
                 }
             }
@@ -316,143 +357,146 @@ fun LoginScreen(userDao: UserDao, onLoginSuccess: (String) -> Unit) {
         return
     }
 
-    Column(
-        modifier = Modifier.fillMaxSize().padding(32.dp),
-        verticalArrangement = Arrangement.Center,
-        horizontalAlignment = Alignment.CenterHorizontally
-    ) {
-        if (isSetup) {
-            Text("First Time Setup", style = MaterialTheme.typography.h5)
-            Spacer(modifier = Modifier.height(12.dp))
-            Text(
-                "Default password: 12345678",
-                style = MaterialTheme.typography.h6,
-                color = MaterialTheme.colors.primary
-            )
-            Spacer(modifier = Modifier.height(8.dp))
-            Text(
-                "You must set your own password to continue",
-                style = MaterialTheme.typography.body2,
-                color = MaterialTheme.colors.onSurface.copy(alpha = 0.7f)
-            )
-            Spacer(modifier = Modifier.height(24.dp))
-
-            OutlinedTextField(
-                value = password,
-                onValueChange = { password = it },
-                label = { Text("Enter default password (12345678)") },
-                visualTransformation = PasswordVisualTransformation(),
-                modifier = Modifier.fillMaxWidth()
-            )
-            Spacer(modifier = Modifier.height(8.dp))
-
-            OutlinedTextField(
-                value = newPassword,
-                onValueChange = { newPassword = it },
-                label = { Text("Set your new password") },
-                visualTransformation = PasswordVisualTransformation(),
-                modifier = Modifier.fillMaxWidth()
-            )
-            Spacer(modifier = Modifier.height(8.dp))
-
-            OutlinedTextField(
-                value = confirmPassword,
-                onValueChange = { confirmPassword = it },
-                label = { Text("Confirm new password") },
-                visualTransformation = PasswordVisualTransformation(),
-                modifier = Modifier.fillMaxWidth()
-            )
-            Spacer(modifier = Modifier.height(16.dp))
-
-            if (error.isNotEmpty()) {
-                Text(error, color = MaterialTheme.colors.error, style = MaterialTheme.typography.body2)
+    // Wrap in Surface with dark background so login screen is dark themed
+    Surface(color = MaterialTheme.colors.background) {
+        Column(
+            modifier = Modifier.fillMaxSize().padding(32.dp),
+            verticalArrangement = Arrangement.Center,
+            horizontalAlignment = Alignment.CenterHorizontally
+        ) {
+            if (isSetup) {
+                Text("First Time Setup", style = MaterialTheme.typography.h5, color = MaterialTheme.colors.onBackground)
+                Spacer(modifier = Modifier.height(12.dp))
+                Text(
+                    "Default password: 12345678",
+                    style = MaterialTheme.typography.h6,
+                    color = MaterialTheme.colors.primary
+                )
                 Spacer(modifier = Modifier.height(8.dp))
-            }
+                Text(
+                    "You must set your own password to continue",
+                    style = MaterialTheme.typography.body2,
+                    color = MaterialTheme.colors.onBackground.copy(alpha = 0.7f)
+                )
+                Spacer(modifier = Modifier.height(24.dp))
 
-            Button(
-                onClick = {
-                    error = ""
-                    if (password != "12345678") {
-                        error = "Default password is incorrect"
-                        return@Button
-                    }
-                    if (newPassword.isEmpty()) {
-                        error = "New password cannot be empty"
-                        return@Button
-                    }
-                    if (newPassword != confirmPassword) {
-                        error = "Passwords do not match"
-                        return@Button
-                    }
-
-                    scope.launch {
-                        try {
-                            withContext(Dispatchers.IO) {
-                                val salt = EncryptionManager.generateSalt()
-                                val hash = EncryptionManager.hashPassword(newPassword, salt)
-                                userDao.saveUser(UserCredsEntity(
-                                    id = 1,
-                                    passwordHash = hash,
-                                    salt = android.util.Base64.encodeToString(salt, android.util.Base64.NO_WRAP)
-                                ))
-                            }
-                            Toast.makeText(context, "Password set!", Toast.LENGTH_SHORT).show()
-                            onLoginSuccess(newPassword)
-                        } catch (e: Exception) {
-                            logError(Err.E004, "Failed to save new password", e)
-                            error = "${Err.E004}: ${e.message}"
-                        }
-                    }
-                },
-                modifier = Modifier.fillMaxWidth()
-            ) {
-                Text("Set Password & Continue")
-            }
-        } else {
-            Text("Unlock Notes", style = MaterialTheme.typography.h5)
-            Spacer(modifier = Modifier.height(24.dp))
-
-            OutlinedTextField(
-                value = password,
-                onValueChange = { password = it },
-                label = { Text("Password") },
-                visualTransformation = PasswordVisualTransformation(),
-                modifier = Modifier.fillMaxWidth()
-            )
-            Spacer(modifier = Modifier.height(16.dp))
-
-            if (error.isNotEmpty()) {
-                Text(error, color = MaterialTheme.colors.error, style = MaterialTheme.typography.body2)
+                OutlinedTextField(
+                    value = password,
+                    onValueChange = { password = it },
+                    label = { Text("Enter default password (12345678)") },
+                    visualTransformation = PasswordVisualTransformation(),
+                    modifier = Modifier.fillMaxWidth()
+                )
                 Spacer(modifier = Modifier.height(8.dp))
-            }
 
-            Button(
-                onClick = {
-                    error = ""
-                    scope.launch {
-                        try {
-                            val match = withContext(Dispatchers.IO) {
-                                val user = userDao.getUser()
-                                if (user != null) {
-                                    val salt = android.util.Base64.decode(user.salt, android.util.Base64.NO_WRAP)
-                                    val hash = EncryptionManager.hashPassword(password, salt)
-                                    hash == user.passwordHash
-                                } else false
-                            }
-                            if (match) {
-                                onLoginSuccess(password)
-                            } else {
-                                error = "Incorrect password"
-                            }
-                        } catch (e: Exception) {
-                            logError(Err.E005, "Password verification failed", e)
-                            error = "${Err.E005}: ${e.message}"
+                OutlinedTextField(
+                    value = newPassword,
+                    onValueChange = { newPassword = it },
+                    label = { Text("Set your new password") },
+                    visualTransformation = PasswordVisualTransformation(),
+                    modifier = Modifier.fillMaxWidth()
+                )
+                Spacer(modifier = Modifier.height(8.dp))
+
+                OutlinedTextField(
+                    value = confirmPassword,
+                    onValueChange = { confirmPassword = it },
+                    label = { Text("Confirm new password") },
+                    visualTransformation = PasswordVisualTransformation(),
+                    modifier = Modifier.fillMaxWidth()
+                )
+                Spacer(modifier = Modifier.height(16.dp))
+
+                if (error.isNotEmpty()) {
+                    Text(error, color = MaterialTheme.colors.error, style = MaterialTheme.typography.body2)
+                    Spacer(modifier = Modifier.height(8.dp))
+                }
+
+                Button(
+                    onClick = {
+                        error = ""
+                        if (password != "12345678") {
+                            error = "Default password is incorrect"
+                            return@Button
                         }
-                    }
-                },
-                modifier = Modifier.fillMaxWidth()
-            ) {
-                Text("Unlock")
+                        if (newPassword.isEmpty()) {
+                            error = "New password cannot be empty"
+                            return@Button
+                        }
+                        if (newPassword != confirmPassword) {
+                            error = "Passwords do not match"
+                            return@Button
+                        }
+
+                        scope.launch {
+                            try {
+                                withContext(Dispatchers.IO) {
+                                    val salt = EncryptionManager.generateSalt()
+                                    val hash = EncryptionManager.hashPassword(newPassword, salt)
+                                    userDao.saveUser(UserCredsEntity(
+                                        id = 1,
+                                        passwordHash = hash,
+                                        salt = android.util.Base64.encodeToString(salt, android.util.Base64.NO_WRAP)
+                                    ))
+                                }
+                                Toast.makeText(context, "Password set!", Toast.LENGTH_SHORT).show()
+                                onLoginSuccess(newPassword)
+                            } catch (e: Exception) {
+                                logError(Err.E004, "Failed to save new password", e)
+                                error = "${Err.E004}: ${e.message}"
+                            }
+                        }
+                    },
+                    modifier = Modifier.fillMaxWidth()
+                ) {
+                    Text("Set Password & Continue")
+                }
+            } else {
+                Text("Unlock Notes", style = MaterialTheme.typography.h5, color = MaterialTheme.colors.onBackground)
+                Spacer(modifier = Modifier.height(24.dp))
+
+                OutlinedTextField(
+                    value = password,
+                    onValueChange = { password = it },
+                    label = { Text("Password") },
+                    visualTransformation = PasswordVisualTransformation(),
+                    modifier = Modifier.fillMaxWidth()
+                )
+                Spacer(modifier = Modifier.height(16.dp))
+
+                if (error.isNotEmpty()) {
+                    Text(error, color = MaterialTheme.colors.error, style = MaterialTheme.typography.body2)
+                    Spacer(modifier = Modifier.height(8.dp))
+                }
+
+                Button(
+                    onClick = {
+                        error = ""
+                        scope.launch {
+                            try {
+                                val match = withContext(Dispatchers.IO) {
+                                    val user = userDao.getUser()
+                                    if (user != null) {
+                                        val salt = android.util.Base64.decode(user.salt, android.util.Base64.NO_WRAP)
+                                        val hash = EncryptionManager.hashPassword(password, salt)
+                                        hash == user.passwordHash
+                                    } else false
+                                }
+                                if (match) {
+                                    onLoginSuccess(password)
+                                } else {
+                                    error = "Incorrect password"
+                                }
+                            } catch (e: Exception) {
+                                logError(Err.E005, "Password verification failed", e)
+                                error = "${Err.E005}: ${e.message}"
+                            }
+                        }
+                    },
+                    modifier = Modifier.fillMaxWidth()
+                ) {
+                    Text("Unlock")
+                }
             }
         }
     }
@@ -469,7 +513,7 @@ fun SettingsScreen(
         Text("Settings", style = MaterialTheme.typography.h5)
         Spacer(modifier = Modifier.height(16.dp))
 
-        Row(verticalAlignment = Alignment.CenterVertically) {
+        Row(verticalAlignment = Alignment.CenterHorizontally) {
             Text("Dark Theme")
             Spacer(modifier = Modifier.weight(1f))
             Switch(checked = currentTheme, onCheckedChange = onThemeToggle)
