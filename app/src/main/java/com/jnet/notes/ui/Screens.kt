@@ -13,6 +13,7 @@ import androidx.compose.material.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.input.PasswordVisualTransformation
 import androidx.compose.ui.unit.dp
@@ -205,7 +206,7 @@ fun NoteEditScreen(
                 title = { Text(if (noteId == null) "New Note" else "Edit Note") },
                 navigationIcon = {
                     TextButton(onClick = onCancel) {
-                        Text("Close", color = MaterialTheme.colors.onPrimary)
+                        Text("Close", color = Color.White)
                     }
                 },
                 actions = {
@@ -297,7 +298,7 @@ fun NoteEditScreen(
                     OutlinedButton(
                         onClick = {
                             val clipboard = context.getSystemService(Context.CLIPBOARD_SERVICE) as android.content.ClipboardManager
-                            val clip = android.content.ClipData.newPlainText("Note", "${title}\n\n${content}")
+                            val clip = android.content.ClipData.newPlainText("Note", content)
                             clipboard.setPrimaryClip(clip)
                             Toast.makeText(context, "Copied to clipboard", Toast.LENGTH_SHORT).show()
                         },
