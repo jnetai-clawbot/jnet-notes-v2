@@ -1,6 +1,7 @@
 package com.jnet.notes.ui
 
 import android.widget.Toast
+import android.util.Log
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
@@ -23,13 +24,44 @@ import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 import kotlinx.coroutines.launch
 
+private const val TAG = "JNetNotes"
+
+// Error codes for remote debugging
+object Err {
+    const val E001 = "E001: DB_INIT_FAILED"
+    const val E002 = "E002: USER_LOOKUP_FAILED"
+    const val E003 = "E003: PASSWORD_HASH_FAILED"
+    const val E004 = "E004: PASSWORD_SAVE_FAILED"
+    const val E005 = "E005: PASSWORD_VERIFY_FAILED"
+    const val E006 = "E006: NOTES_LOAD_FAILED"
+    const val E007 = "E007: NOTE_SAVE_FAILED"
+    const val E008 = "E008: ENCRYPTION_FAILED"
+    const val E009 = "E009: DECRYPTION_FAILED"
+    const val E010 = "E010: EXPORT_FAILED"
+    const val E011 = "E011: IMPORT_FAILED"
+    const val E012 = "E012: SYNC_AUTH_FAILED"
+    const val E013 = "E013: SYNC_UPLOAD_FAILED"
+    const val E014 = "E014: SYNC_PULL_FAILED"
+    const val E015 = "E015: UNEXPECTED_ERROR"
+}
+
+fun logError(code: String, msg: String, e: Throwable? = null) {
+    Log.e(TAG, "$code - $msg", e)
+}
+
 @Composable
 fun NoteListScreen(repository: NotesRepository, onNoteClick: (Int) -> Unit, onAddNote: () -> Unit) {
     var notes by remember { mutableStateOf(listOf<NoteEntity>()) }
+    var loadError by remember { mutableStateOf("") }
     val scope = rememberCoroutineScope()
     
     LaunchedEffect(Unit) {
-        notes = withContext(Dispatchers.IO) { repository.getAllNotes() }
+        try {
+            notes = withContext(Dispatchers.IO) { repository.getAllNotes() }
+        } catch (e: Exception) {
+            logError(Err.E006, "Failed to load notes", e)
+            loadError = "${Err.E006}: ${e.message}"
+        }
     }
 
     Scaffold(
@@ -40,12 +72,21 @@ fun NoteListScreen(repository: NotesRepository, onNoteClick: (Int) -> Unit, onAd
             }
         }
     ) { paddingValues ->
-        LazyColumn(modifier = Modifier.fillMaxSize().padding(paddingValues).padding(16.dp)) {
-            items(notes) { note ->
-                Card(
-                    modifier = Modifier.fillMaxWidth().padding(vertical = 8.dp).clickable { onNoteClick(note.id) }
-                ) {
-                    Text(text = note.title, modifier = Modifier.padding(16.dp))
+        if (loadError.isNotEmpty()) {
+            Column(modifier = Modifier.fillMaxSize().padding(paddingValues).padding(16.dp)) {
+                Text("Error loading notes", style = MaterialTheme.typography.h6, color = MaterialTheme.colors.error)
+                Text(loadError, style = MaterialTheme.typography.body2, color = MaterialTheme.colors.error)
+                Spacer(modifier = Modifier.height(8.dp))
+                Button(onClick = { loadError = "" }) { Text("Dismiss") }
+            }
+        } else {
+            LazyColumn(modifier = Modifier.fillMaxSize().padding(paddingValues).padding(16.dp)) {
+                items(notes) { note ->
+                    Card(
+                        modifier = Modifier.fillMaxWidth().padding(vertical = 8.dp).clickable { onNoteClick(note.id) }
+                    ) {
+                        Text(text = note.title, modifier = Modifier.padding(16.dp))
+                    }
                 }
             }
         }
@@ -66,9 +107,14 @@ fun LoginScreen(userDao: UserDao, onLoginSuccess: () -> Unit) {
     
     // Check if user already exists on first load
     LaunchedEffect(Unit) {
-        withContext(Dispatchers.IO) {
-            val existing = userDao.getUser()
-            isSetup = (existing == null)
+        try {
+            withContext(Dispatchers.IO) {
+                val existing = userDao.getUser()
+                isSetup = (existing == null)
+            }
+        } catch (e: Exception) {
+            logError(Err.E002, "Failed to check existing user", e)
+            error = "${Err.E002}: ${e.message}"
         }
         checkedExisting = true
     }
@@ -152,17 +198,22 @@ fun LoginScreen(userDao: UserDao, onLoginSuccess: () -> Unit) {
                     
                     // Save new password
                     scope.launch {
-                        withContext(Dispatchers.IO) {
-                            val salt = EncryptionManager.generateSalt()
-                            val hash = EncryptionManager.hashPassword(newPassword, salt)
-                            userDao.saveUser(UserCredsEntity(
-                                id = 1,
-                                passwordHash = hash,
-                                salt = android.util.Base64.encodeToString(salt, android.util.Base64.NO_WRAP)
-                            ))
+                        try {
+                            withContext(Dispatchers.IO) {
+                                val salt = EncryptionManager.generateSalt()
+                                val hash = EncryptionManager.hashPassword(newPassword, salt)
+                                userDao.saveUser(UserCredsEntity(
+                                    id = 1,
+                                    passwordHash = hash,
+                                    salt = android.util.Base64.encodeToString(salt, android.util.Base64.NO_WRAP)
+                                ))
+                            }
+                            Toast.makeText(context, "Password set!", Toast.LENGTH_SHORT).show()
+                            onLoginSuccess()
+                        } catch (e: Exception) {
+                            logError(Err.E004, "Failed to save new password", e)
+                            error = "${Err.E004}: ${e.message}"
                         }
-                        Toast.makeText(context, "Password set!", Toast.LENGTH_SHORT).show()
-                        onLoginSuccess()
                     }
                 },
                 modifier = Modifier.fillMaxWidth()
@@ -192,18 +243,23 @@ fun LoginScreen(userDao: UserDao, onLoginSuccess: () -> Unit) {
                 onClick = {
                     error = ""
                     scope.launch {
-                        val match = withContext(Dispatchers.IO) {
-                            val user = userDao.getUser()
-                            if (user != null) {
-                                val salt = android.util.Base64.decode(user.salt, android.util.Base64.NO_WRAP)
-                                val hash = EncryptionManager.hashPassword(password, salt)
-                                hash == user.passwordHash
-                            } else false
-                        }
-                        if (match) {
-                            onLoginSuccess()
-                        } else {
-                            error = "Incorrect password"
+                        try {
+                            val match = withContext(Dispatchers.IO) {
+                                val user = userDao.getUser()
+                                if (user != null) {
+                                    val salt = android.util.Base64.decode(user.salt, android.util.Base64.NO_WRAP)
+                                    val hash = EncryptionManager.hashPassword(password, salt)
+                                    hash == user.passwordHash
+                                } else false
+                            }
+                            if (match) {
+                                onLoginSuccess()
+                            } else {
+                                error = "Incorrect password"
+                            }
+                        } catch (e: Exception) {
+                            logError(Err.E005, "Password verification failed", e)
+                            error = "${Err.E005}: ${e.message}"
                         }
                     }
                 },
