@@ -27,27 +27,23 @@ class NotesRepository(
         }
     }
 
-    suspend fun saveNote(title: String, content: String, password: String) {
-        try {
-            val user = userDao.getUser() ?: throw Exception("E007: No user found")
-            val salt = Base64.decode(user.salt, Base64.NO_WRAP)
-            val encrypted = try {
-                EncryptionManager.encrypt(content, password, salt)
-            } catch (e: Exception) {
-                throw Exception("E008: Encryption failed - ${e.message}")
-            }
-            
-            val note = NoteEntity(
-                title = title,
-                encryptedContent = encrypted,
-                timestamp = System.currentTimeMillis(),
-                syncStatus = 0
-            )
-            noteDao.insertNote(note)
-        } catch (e: Exception) {
-            Log.e(TAG, "E007: Failed to save note - ${e.message}", e)
-            throw e
-        }
+    suspend fun saveNote(title: String, content: String, password: String): NoteEntity {
+        val user = userDao.getUser() ?: throw Exception("E002: No user found")
+        val salt = Base64.decode(user.salt, Base64.NO_WRAP)
+        val encrypted = EncryptionManager.encrypt(content, password, salt)
+        
+        val note = NoteEntity(
+            title = title,
+            encryptedContent = encrypted,
+            timestamp = System.currentTimeMillis(),
+            syncStatus = 0
+        )
+        noteDao.insertNote(note)
+        return note
+    }
+
+    suspend fun deleteNote(note: NoteEntity) {
+        noteDao.deleteNote(note)
     }
 
     suspend fun getDecryptedNote(note: NoteEntity, password: String): String {

@@ -17,38 +17,51 @@ class MainActivity : ComponentActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         
-        // Initialize Database
         val db = Room.databaseBuilder(
             applicationContext,
             AppDatabase::class.java,
             "notes-db"
         ).build()
 
-        // Initialize Retrofit API
         val retrofit = Retrofit.Builder()
             .baseUrl("https://api.jnetai.com/")
             .addConverterFactory(GsonConverterFactory.create())
             .build()
         val api = retrofit.create(RemoteNotesApi::class.java)
-
-        // Initialize Repository
         val repository = NotesRepository(db.noteDao(), db.userDao(), api)
         
         setContent {
             var isDark by remember { mutableStateOf(true) }
             var unlocked by remember { mutableStateOf(false) }
+            var currentScreen by remember { mutableStateOf("login") }
+            var editingNoteId by remember { mutableStateOf<Int?>(null) }
             
             JNetNotesTheme(darkTheme = isDark) {
-                if (!unlocked) {
-                    LoginScreen(
+                when (currentScreen) {
+                    "login" -> LoginScreen(
                         userDao = db.userDao(),
-                        onLoginSuccess = { unlocked = true }
+                        onLoginSuccess = { currentScreen = "list" }
                     )
-                } else {
-                    NoteListScreen(
+                    "list" -> NoteListScreen(
                         repository = repository,
-                        onNoteClick = { id -> /* navigate to editor */ },
-                        onAddNote = { /* navigate to add */ }
+                        onNoteClick = { id -> 
+                            editingNoteId = id
+                            currentScreen = "edit"
+                        },
+                        onAddNote = { 
+                            editingNoteId = null
+                            currentScreen = "edit"
+                        },
+                        onLogout = { 
+                            unlocked = false
+                            currentScreen = "login"
+                        }
+                    )
+                    "edit" -> NoteEditScreen(
+                        repository = repository,
+                        noteId = editingNoteId,
+                        onSave = { currentScreen = "list" },
+                        onCancel = { currentScreen = "list" }
                     )
                 }
             }

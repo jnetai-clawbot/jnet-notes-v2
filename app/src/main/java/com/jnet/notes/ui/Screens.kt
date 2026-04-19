@@ -26,7 +26,6 @@ import kotlinx.coroutines.launch
 
 private const val TAG = "JNetNotes"
 
-// Error codes for remote debugging
 object Err {
     const val E001 = "E001: DB_INIT_FAILED"
     const val E002 = "E002: USER_LOOKUP_FAILED"
@@ -50,7 +49,12 @@ fun logError(code: String, msg: String, e: Throwable? = null) {
 }
 
 @Composable
-fun NoteListScreen(repository: NotesRepository, onNoteClick: (Int) -> Unit, onAddNote: () -> Unit) {
+fun NoteListScreen(
+    repository: NotesRepository, 
+    onNoteClick: (Int) -> Unit, 
+    onAddNote: () -> Unit,
+    onLogout: () -> Unit
+) {
     var notes by remember { mutableStateOf(listOf<NoteEntity>()) }
     var loadError by remember { mutableStateOf("") }
     val scope = rememberCoroutineScope()
@@ -65,7 +69,16 @@ fun NoteListScreen(repository: NotesRepository, onNoteClick: (Int) -> Unit, onAd
     }
 
     Scaffold(
-        topBar = { TopAppBar(title = { Text("J~Net Notes") }) },
+        topBar = { 
+            TopAppBar(
+                title = { Text("J~Net Notes") },
+                actions = {
+                    TextButton(onClick = onLogout) {
+                        Text("Logout", color = MaterialTheme.colors.onPrimary)
+                    }
+                }
+            )
+        },
         floatingActionButton = {
             FloatingActionButton(onClick = onAddNote) {
                 Text("+")
@@ -79,13 +92,188 @@ fun NoteListScreen(repository: NotesRepository, onNoteClick: (Int) -> Unit, onAd
                 Spacer(modifier = Modifier.height(8.dp))
                 Button(onClick = { loadError = "" }) { Text("Dismiss") }
             }
+        } else if (notes.isEmpty()) {
+            Box(modifier = Modifier.fillMaxSize().padding(paddingValues), contentAlignment = Alignment.Center) {
+                Column(horizontalAlignment = Alignment.CenterHorizontally) {
+                    Text("No notes yet", style = MaterialTheme.typography.h6, color = MaterialTheme.colors.onSurface.copy(alpha = 0.5f))
+                    Spacer(modifier = Modifier.height(8.dp))
+                    Text("Tap + to create one", style = MaterialTheme.typography.body2, color = MaterialTheme.colors.onSurface.copy(alpha = 0.4f))
+                }
+            }
         } else {
             LazyColumn(modifier = Modifier.fillMaxSize().padding(paddingValues).padding(16.dp)) {
                 items(notes) { note ->
                     Card(
-                        modifier = Modifier.fillMaxWidth().padding(vertical = 8.dp).clickable { onNoteClick(note.id) }
+                        modifier = Modifier.fillMaxWidth().padding(vertical = 4.dp).clickable { onNoteClick(note.id) },
+                        elevation = 2.dp
                     ) {
-                        Text(text = note.title, modifier = Modifier.padding(16.dp))
+                        Column(modifier = Modifier.padding(12.dp)) {
+                            Text(text = note.title, style = MaterialTheme.typography.subtitle1)
+                            Text(
+                                text = java.text.SimpleDateFormat("dd/MM/yyyy HH:mm", java.util.Locale.getDefault()).format(java.util.Date(note.timestamp)),
+                                style = MaterialTheme.typography.caption,
+                                color = MaterialTheme.colors.onSurface.copy(alpha = 0.5f)
+                            )
+                        }
+                    }
+                }
+            }
+        }
+    }
+}
+
+@Composable
+fun NoteEditScreen(
+    repository: NotesRepository,
+    noteId: Int?,
+    onSave: () -> Unit,
+    onCancel: () -> Unit
+) {
+    val context = LocalContext.current
+    val scope = rememberCoroutineScope()
+    var title by remember { mutableStateOf("") }
+    var content by remember { mutableStateOf("") }
+    var originalTitle by remember { mutableStateOf("") }
+    var originalContent by remember { mutableStateOf("") }
+    var isLoading by remember { mutableStateOf(noteId != null) }
+    var error by remember { mutableStateOf("") }
+    var showDeleteConfirm by remember { mutableStateOf(false) }
+    
+    // Load existing note if editing
+    if (noteId != null && isLoading) {
+        LaunchedEffect(noteId) {
+            try {
+                val notes = withContext(Dispatchers.IO) { repository.getAllNotes() }
+                val note = notes.find { it.id == noteId }
+                if (note != null) {
+                    title = note.title
+                    content = note.encryptedContent // Will be decrypted later when password is integrated
+                    originalTitle = note.title
+                    originalContent = note.encryptedContent
+                }
+            } catch (e: Exception) {
+                logError(Err.E006, "Failed to load note", e)
+                error = "${Err.E006}: ${e.message}"
+            }
+            isLoading = false
+        }
+    }
+    
+    if (showDeleteConfirm) {
+        AlertDialog(
+            onDismissRequest = { showDeleteConfirm = false },
+            title = { Text("Delete Note?") },
+            text = { Text("This cannot be undone.") },
+            confirmButton = {
+                TextButton(onClick = {
+                    scope.launch {
+                        try {
+                            withContext(Dispatchers.IO) {
+                                val notes = repository.getAllNotes()
+                                val note = notes.find { it.id == noteId }
+                                if (note != null) repository.deleteNote(note)
+                            }
+                            Toast.makeText(context, "Note deleted", Toast.LENGTH_SHORT).show()
+                            onSave()
+                        } catch (e: Exception) {
+                            error = "${Err.E007}: ${e.message}"
+                        }
+                    }
+                    showDeleteConfirm = false
+                }) { Text("Delete", color = MaterialTheme.colors.error) }
+            },
+            dismissButton = {
+                TextButton(onClick = { showDeleteConfirm = false }) { Text("Cancel") }
+            }
+        )
+    }
+    
+    Scaffold(
+        topBar = {
+            TopAppBar(
+                title = { Text(if (noteId == null) "New Note" else "Edit Note") },
+                navigationIcon = {
+                    TextButton(onClick = onCancel) {
+                        Text("Cancel", color = MaterialTheme.colors.onPrimary)
+                    }
+                },
+                actions = {
+                    if (noteId != null) {
+                        TextButton(onClick = { showDeleteConfirm = true }) {
+                            Text("Delete", color = MaterialTheme.colors.error)
+                        }
+                    }
+                }
+            )
+        }
+    ) { paddingValues ->
+        if (isLoading) {
+            Box(modifier = Modifier.fillMaxSize().padding(paddingValues), contentAlignment = Alignment.Center) {
+                CircularProgressIndicator()
+            }
+        } else {
+            Column(modifier = Modifier.fillMaxSize().padding(paddingValues).padding(16.dp)) {
+                if (error.isNotEmpty()) {
+                    Text(error, color = MaterialTheme.colors.error, style = MaterialTheme.typography.body2)
+                    Spacer(modifier = Modifier.height(8.dp))
+                }
+                
+                OutlinedTextField(
+                    value = title,
+                    onValueChange = { title = it },
+                    label = { Text("Title") },
+                    modifier = Modifier.fillMaxWidth(),
+                    singleLine = true
+                )
+                Spacer(modifier = Modifier.height(12.dp))
+                
+                OutlinedTextField(
+                    value = content,
+                    onValueChange = { content = it },
+                    label = { Text("Note content") },
+                    modifier = Modifier.fillMaxWidth().weight(1f),
+                    maxLines = Int.MAX_VALUE
+                )
+                Spacer(modifier = Modifier.height(16.dp))
+                
+                Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceEvenly) {
+                    // Save button
+                    Button(
+                        onClick = {
+                            if (title.isBlank()) {
+                                error = "Title cannot be empty"
+                                return@Button
+                            }
+                            scope.launch {
+                                try {
+                                    withContext(Dispatchers.IO) {
+                                        repository.saveNote(title, content, "local")
+                                    }
+                                    Toast.makeText(context, "Note saved", Toast.LENGTH_SHORT).show()
+                                    onSave()
+                                } catch (e: Exception) {
+                                    logError(Err.E007, "Failed to save note", e)
+                                    error = "${Err.E007}: ${e.message}"
+                                }
+                            }
+                        },
+                        modifier = Modifier.weight(1f).padding(horizontal = 4.dp)
+                    ) {
+                        Text("Save")
+                    }
+                    
+                    // Revert button (only when editing)
+                    if (noteId != null) {
+                        OutlinedButton(
+                            onClick = {
+                                title = originalTitle
+                                content = originalContent
+                                error = ""
+                            },
+                            modifier = Modifier.weight(1f).padding(horizontal = 4.dp)
+                        ) {
+                            Text("Revert")
+                        }
                     }
                 }
             }
@@ -105,7 +293,6 @@ fun LoginScreen(userDao: UserDao, onLoginSuccess: () -> Unit) {
     var checkedExisting by remember { mutableStateOf(false) }
     var error by remember { mutableStateOf("") }
     
-    // Check if user already exists on first load
     LaunchedEffect(Unit) {
         try {
             withContext(Dispatchers.IO) {
@@ -132,7 +319,6 @@ fun LoginScreen(userDao: UserDao, onLoginSuccess: () -> Unit) {
         horizontalAlignment = Alignment.CenterHorizontally
     ) {
         if (isSetup) {
-            // First-time setup - default password is 12345678, user must set their own
             Text("First Time Setup", style = MaterialTheme.typography.h5)
             Spacer(modifier = Modifier.height(12.dp))
             Text(
@@ -196,7 +382,6 @@ fun LoginScreen(userDao: UserDao, onLoginSuccess: () -> Unit) {
                         return@Button
                     }
                     
-                    // Save new password
                     scope.launch {
                         try {
                             withContext(Dispatchers.IO) {
@@ -221,7 +406,6 @@ fun LoginScreen(userDao: UserDao, onLoginSuccess: () -> Unit) {
                 Text("Set Password & Continue")
             }
         } else {
-            // Returning user - just enter password
             Text("Unlock Notes", style = MaterialTheme.typography.h5)
             Spacer(modifier = Modifier.height(24.dp))
             
