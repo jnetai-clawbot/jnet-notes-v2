@@ -36,21 +36,13 @@ class MainActivity : ComponentActivity() {
         
         setContent {
             var isDark by remember { mutableStateOf(true) }
-            var unlockedPassword by remember { mutableStateOf<String?>(null) }
             
             JNetNotesTheme(darkTheme = isDark) {
-                if (unlockedPassword == null) {
-                    LoginScreen(onLoginSuccess = { password ->
-                        unlockedPassword = password
-                    })
-                } else {
-                    // Navigation Logic here (e.g., Compose Navigation)
-                    NoteListScreen(
-                        repository = repository,
-                        onNoteClick = { id -> /* navigate to editor */ },
-                        onAddNote = { /* navigate to add */ }
-                    )
-                }
+                NoteListScreen(
+                    repository = repository,
+                    onNoteClick = { id -> /* navigate to editor */ },
+                    onAddNote = { /* navigate to add */ }
+                )
             }
         }
     }
