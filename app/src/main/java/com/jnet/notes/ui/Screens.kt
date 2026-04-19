@@ -513,7 +513,7 @@ fun SettingsScreen(
         Text("Settings", style = MaterialTheme.typography.h5)
         Spacer(modifier = Modifier.height(16.dp))
 
-        Row(verticalAlignment = Alignment.CenterHorizontally) {
+        Row(verticalAlignment = Alignment.CenterVertically) {
             Text("Dark Theme")
             Spacer(modifier = Modifier.weight(1f))
             Switch(checked = currentTheme, onCheckedChange = onThemeToggle)
