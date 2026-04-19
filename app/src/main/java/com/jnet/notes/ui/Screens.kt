@@ -6,8 +6,6 @@ import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
-import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.Close
 import androidx.compose.material.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
@@ -198,8 +196,8 @@ fun NoteEditScreen(
             TopAppBar(
                 title = { Text(if (noteId == null) "New Note" else "Edit Note") },
                 navigationIcon = {
-                    IconButton(onClick = onCancel) {
-                        Icon(androidx.compose.material.icons.Icons.Default.Close, contentDescription = "Close", tint = MaterialTheme.colors.onPrimary)
+                    TextButton(onClick = onCancel) {
+                        Text("✕", color = MaterialTheme.colors.onPrimary, fontSize = MaterialTheme.typography.h6.fontSize)
                     }
                 },
                 actions = {
