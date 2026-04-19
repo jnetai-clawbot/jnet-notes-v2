@@ -26,7 +26,7 @@ class MainActivity : ComponentActivity() {
 
         // Initialize Retrofit API
         val retrofit = Retrofit.Builder()
-            .baseUrl("https://api.jnetai.com/") // Base URL for remote-notes.php
+            .baseUrl("https://api.jnetai.com/")
             .addConverterFactory(GsonConverterFactory.create())
             .build()
         val api = retrofit.create(RemoteNotesApi::class.java)
@@ -36,13 +36,21 @@ class MainActivity : ComponentActivity() {
         
         setContent {
             var isDark by remember { mutableStateOf(true) }
+            var unlocked by remember { mutableStateOf(false) }
             
             JNetNotesTheme(darkTheme = isDark) {
-                NoteListScreen(
-                    repository = repository,
-                    onNoteClick = { id -> /* navigate to editor */ },
-                    onAddNote = { /* navigate to add */ }
-                )
+                if (!unlocked) {
+                    LoginScreen(
+                        userDao = db.userDao(),
+                        onLoginSuccess = { unlocked = true }
+                    )
+                } else {
+                    NoteListScreen(
+                        repository = repository,
+                        onNoteClick = { id -> /* navigate to editor */ },
+                        onAddNote = { /* navigate to add */ }
+                    )
+                }
             }
         }
     }
