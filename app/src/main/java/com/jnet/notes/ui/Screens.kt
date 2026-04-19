@@ -4,7 +4,7 @@ import android.content.Context
 import android.content.Intent
 import android.widget.Toast
 import android.util.Log
-import androidx.activity.result.contract.ActivityResultContracts
+import android.net.Uri
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
@@ -28,8 +28,6 @@ import kotlinx.coroutines.withContext
 import kotlinx.coroutines.launch
 
 private const val TAG = "JNetNotes"
-private const val EXPORT_REQUEST = 1001
-private const val IMPORT_REQUEST = 1002
 
 object Err {
     const val E001 = "E001: DB_INIT_FAILED"
@@ -152,7 +150,6 @@ fun NoteEditScreen(
     var error by remember { mutableStateOf("") }
     var showDeleteConfirm by remember { mutableStateOf(false) }
 
-    // Load existing note if editing
     if (noteId != null && isLoading) {
         LaunchedEffect(noteId) {
             try {
@@ -509,38 +506,13 @@ fun LoginScreen(userDao: UserDao, onLoginSuccess: (String) -> Unit) {
 fun SettingsScreen(
     repository: NotesRepository,
     password: String,
-    onBack: () -> Unit
+    onBack: () -> Unit,
+    onImportFile: () -> Unit = {}
 ) {
     val context = LocalContext.current
     val scope = rememberCoroutineScope()
     var statusMessage by remember { mutableStateOf("") }
     var isExporting by remember { mutableStateOf(false) }
-    var isImporting by remember { mutableStateOf(false) }
-
-    // Register activity result for import
-    val importLauncher = rememberLauncherForActivityResult(
-        contract = androidx.activity.result.contract.ActivityResultContracts.GetContent()
-    ) { uri ->
-        uri?.let {
-            isImporting = true
-            scope.launch {
-                try {
-                    val json = withContext(Dispatchers.IO) {
-                        context.contentResolver.openInputStream(uri)?.bufferedReader()?.readText()
-                            ?: throw Exception("Could not read file")
-                    }
-                    withContext(Dispatchers.IO) {
-                        repository.importNotesFromJson(json, password)
-                    }
-                    statusMessage = "Import complete!"
-                } catch (e: Exception) {
-                    logError(Err.E011, "Import failed", e)
-                    statusMessage = "${Err.E011}: ${e.message}"
-                }
-                isImporting = false
-            }
-        }
-    }
 
     Scaffold(
         topBar = {
@@ -605,20 +577,12 @@ fun SettingsScreen(
                 }
             }
 
-            // Import button
+            // Import button — uses onImportFile callback to trigger Activity-level file picker
             OutlinedButton(
-                onClick = {
-                    statusMessage = ""
-                    importLauncher.launch("application/json")
-                },
-                modifier = Modifier.fillMaxWidth().padding(vertical = 8.dp),
-                enabled = !isImporting
+                onClick = onImportFile,
+                modifier = Modifier.fillMaxWidth().padding(vertical = 8.dp)
             ) {
-                if (isImporting) {
-                    CircularProgressIndicator(color = MaterialTheme.colors.onPrimary, modifier = Modifier.size(20.dp))
-                } else {
-                    Text("Import Encrypted Backup")
-                }
+                Text("Import Encrypted Backup")
             }
 
             if (statusMessage.isNotEmpty()) {
