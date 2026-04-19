@@ -58,7 +58,8 @@ class MainActivity : ComponentActivity() {
                         onLogout = { 
                             sessionPassword = ""
                             currentScreen = "login"
-                        }
+                        },
+                        onSettings = { currentScreen = "settings" }
                     )
                     "edit" -> NoteEditScreen(
                         repository = repository,
