@@ -10,6 +10,9 @@ import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.material.*
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.Clear
+import androidx.compose.material.icons.filled.Search
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -63,6 +66,8 @@ fun NoteListScreen(
 ) {
     var notes by remember { mutableStateOf(listOf<NoteEntity>()) }
     var loadError by remember { mutableStateOf("") }
+    var searchQuery by remember { mutableStateOf("") }
+    var decryptedContentCache by remember { mutableStateOf(mapOf<Int, String>()) }
     val scope = rememberCoroutineScope()
 
     LaunchedEffect(Unit) {
@@ -71,6 +76,37 @@ fun NoteListScreen(
         } catch (e: Exception) {
             logError(Err.E006, "Failed to load notes", e)
             loadError = "${Err.E006}: ${e.message}"
+        }
+    }
+
+    // Filter logic: search title first, then content if no title match
+    val filteredNotes = if (searchQuery.isBlank()) {
+        notes
+    } else {
+        val query = searchQuery.lowercase()
+        val titleMatches = notes.filter { it.title.lowercase().contains(query) }
+        if (titleMatches.isNotEmpty()) {
+            titleMatches
+        } else {
+            // Decrypt and search content
+            scope.launch {
+                val cache = mutableMapOf<Int, String>()
+                for (note in notes) {
+                    if (!decryptedContentCache.containsKey(note.id)) {
+                        try {
+                            val decrypted = withContext(Dispatchers.IO) { repository.getDecryptedNote(note, password) }
+                            cache[note.id] = decrypted
+                        } catch (e: Exception) {
+                            cache[note.id] = ""
+                        }
+                    }
+                }
+                decryptedContentCache = decryptedContentCache + cache
+            }
+            notes.filter { note ->
+                val cachedContent = decryptedContentCache[note.id] ?: ""
+                cachedContent.lowercase().contains(query)
+            }
         }
     }
 
@@ -96,35 +132,74 @@ fun NoteListScreen(
             }
         }
     ) { paddingValues ->
-        if (loadError.isNotEmpty()) {
-            Column(modifier = Modifier.fillMaxSize().padding(paddingValues).padding(16.dp)) {
-                Text("Error loading notes", style = MaterialTheme.typography.h6, color = MaterialTheme.colors.error)
-                Text(loadError, style = MaterialTheme.typography.body2, color = MaterialTheme.colors.error)
-                Spacer(modifier = Modifier.height(8.dp))
-                Button(onClick = { loadError = "" }) { Text("Dismiss") }
+        Column(modifier = Modifier.fillMaxSize().padding(paddingValues)) {
+            // Search bar
+            OutlinedTextField(
+                value = searchQuery,
+                onValueChange = { searchQuery = it },
+                modifier = Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 8.dp),
+                placeholder = { Text("🔍 Search notes...") },
+                leadingIcon = {
+                    Icon(Icons.Default.Search, contentDescription = "Search")
+                },
+                trailingIcon = {
+                    if (searchQuery.isNotEmpty()) {
+                        IconButton(onClick = { searchQuery = "" }) {
+                            Icon(Icons.Default.Clear, contentDescription = "Clear search")
+                        }
+                    }
+                },
+                singleLine = true
+            )
+            
+            // Results count
+            if (searchQuery.isNotEmpty()) {
+                Text(
+                    text = "Showing ${filteredNotes.size} of ${notes.size} notes",
+                    modifier = Modifier.padding(horizontal = 16.dp, vertical = 2.dp),
+                    style = MaterialTheme.typography.caption,
+                    color = MaterialTheme.colors.onSurface.copy(alpha = 0.5f)
+                )
             }
-        } else if (notes.isEmpty()) {
-            Box(modifier = Modifier.fillMaxSize().padding(paddingValues), contentAlignment = Alignment.Center) {
-                Column(horizontalAlignment = Alignment.CenterHorizontally) {
-                    Text("No notes yet", style = MaterialTheme.typography.h6, color = MaterialTheme.colors.onSurface.copy(alpha = 0.5f))
+            
+            if (loadError.isNotEmpty()) {
+                Column(modifier = Modifier.fillMaxSize().padding(16.dp)) {
+                    Text("Error loading notes", style = MaterialTheme.typography.h6, color = MaterialTheme.colors.error)
+                    Text(loadError, style = MaterialTheme.typography.body2, color = MaterialTheme.colors.error)
                     Spacer(modifier = Modifier.height(8.dp))
-                    Text("Tap + to create one", style = MaterialTheme.typography.body2, color = MaterialTheme.colors.onSurface.copy(alpha = 0.4f))
+                    Button(onClick = { loadError = "" }) { Text("Dismiss") }
                 }
-            }
-        } else {
-            LazyColumn(modifier = Modifier.fillMaxSize().padding(paddingValues).padding(16.dp)) {
-                items(notes) { note ->
-                    Card(
-                        modifier = Modifier.fillMaxWidth().padding(vertical = 4.dp).clickable { onNoteClick(note.id) },
-                        elevation = 2.dp
-                    ) {
-                        Column(modifier = Modifier.padding(12.dp)) {
-                            Text(text = note.title, style = MaterialTheme.typography.subtitle1)
-                            Text(
-                                text = java.text.SimpleDateFormat("dd/MM/yyyy HH:mm", java.util.Locale.getDefault()).format(java.util.Date(note.timestamp)),
-                                style = MaterialTheme.typography.caption,
-                                color = MaterialTheme.colors.onSurface.copy(alpha = 0.5f)
-                            )
+            } else if (notes.isEmpty()) {
+                Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
+                    Column(horizontalAlignment = Alignment.CenterHorizontally) {
+                        Text("No notes yet", style = MaterialTheme.typography.h6, color = MaterialTheme.colors.onSurface.copy(alpha = 0.5f))
+                        Spacer(modifier = Modifier.height(8.dp))
+                        Text("Tap + to create one", style = MaterialTheme.typography.body2, color = MaterialTheme.colors.onSurface.copy(alpha = 0.4f))
+                    }
+                }
+            } else if (filteredNotes.isEmpty() && searchQuery.isNotEmpty()) {
+                Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
+                    Column(horizontalAlignment = Alignment.CenterHorizontally) {
+                        Text("No matches found", style = MaterialTheme.typography.h6, color = MaterialTheme.colors.onSurface.copy(alpha = 0.5f))
+                        Spacer(modifier = Modifier.height(8.dp))
+                        Text("Try a different search term", style = MaterialTheme.typography.body2, color = MaterialTheme.colors.onSurface.copy(alpha = 0.4f))
+                    }
+                }
+            } else {
+                LazyColumn(modifier = Modifier.fillMaxSize().padding(horizontal = 16.dp)) {
+                    items(filteredNotes) { note ->
+                        Card(
+                            modifier = Modifier.fillMaxWidth().padding(vertical = 4.dp).clickable { onNoteClick(note.id) },
+                            elevation = 2.dp
+                        ) {
+                            Column(modifier = Modifier.padding(12.dp)) {
+                                Text(text = note.title, style = MaterialTheme.typography.subtitle1)
+                                Text(
+                                    text = java.text.SimpleDateFormat("dd/MM/yyyy HH:mm", java.util.Locale.getDefault()).format(java.util.Date(note.timestamp)),
+                                    style = MaterialTheme.typography.caption,
+                                    color = MaterialTheme.colors.onSurface.copy(alpha = 0.5f)
+                                )
+                            }
                         }
                     }
                 }

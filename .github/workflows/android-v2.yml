@@ -29,11 +29,16 @@ jobs:
       - name: List APK outputs
         run: find app/build/outputs/apk -name '*.apk' -type f
 
+      - name: Rename APK
+        run: |
+          cp app/build/outputs/apk/release/app-release.apk \
+             app/build/outputs/apk/release/Secure-Notes.apk
+
       - name: Create Release and Upload APK
         uses: softprops/action-gh-release@v2
         with:
           tag_name: v1.0.${{ github.run_number }}
-          name: Release v1.0.${{ github.run_number }}
-          files: app/build/outputs/apk/release/*.apk
+          name: Secure Notes v1.0.${{ github.run_number }}
+          files: app/build/outputs/apk/release/Secure-Notes.apk
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
