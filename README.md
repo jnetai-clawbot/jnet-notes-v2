@@ -1,4 +1,4 @@
-# Job 33: J~Net Notes Android App
+# Job 33: J~Net Secure Notes Android App
 
 ## Overview
 A hybrid Android application for note-taking that provides a seamless experience between offline local storage (SQLite) and online synchronization via the J~Net cloud infrastructure.
