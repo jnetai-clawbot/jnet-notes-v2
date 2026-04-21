@@ -60,14 +60,19 @@ class NotesRepository(
     // --- Export/Import Logic ---
     suspend fun exportNotesToJson(): String {
         return try {
+            val user = userDao.getUser() ?: throw Exception("E002: No user found")
             val notes = noteDao.getAllNotes()
-            val exportData = notes.map { 
-                mapOf(
-                    "title" to it.title, 
-                    "content" to it.encryptedContent, 
-                    "timestamp" to it.timestamp
-                )
-            }
+            val exportData = mapOf(
+                "version" to 2,
+                "salt" to user.salt,
+                "notes" to notes.map { 
+                    mapOf(
+                        "title" to it.title, 
+                        "content" to it.encryptedContent, 
+                        "timestamp" to it.timestamp
+                    )
+                }
+            )
             Gson().toJson(exportData)
         } catch (e: Exception) {
             Log.e(TAG, "E010: Export failed - ${e.message}", e)
@@ -77,14 +82,49 @@ class NotesRepository(
 
     suspend fun importNotesFromJson(json: String, password: String) {
         try {
-            val type = object : TypeToken<List<Map<String, Any>>>() {}.type
-            val importedNotes: List<Map<String, Any>> = Gson().fromJson(json, type)
+            val user = userDao.getUser() ?: throw Exception("E002: No user found")
+            val localSalt = Base64.decode(user.salt, Base64.NO_WRAP)
+            val type = object : TypeToken<Map<String, Any>>() {}.type
+            val data: Map<String, Any> = Gson().fromJson(json, type)
             
-            importedNotes.forEach { data ->
+            // Version 2 format: includes salt, decrypt with source salt then re-encrypt with local salt
+            val sourceSaltBase64 = data["salt"] as? String
+            val notesList = (data["notes"] as? List<Map<String, Any>>)
+                ?: (data["notes"] as? List<*>)?.filterIsInstance<Map<String, Any>>()
+                ?: emptyList()
+            
+            // If we have a source salt (v2 format), decrypt with it then re-encrypt with local salt
+            // If no salt (v1 format), content was already stored with local salt — just insert as-is
+            val needsReEncrypt = sourceSaltBase64 != null
+            val sourceSalt = sourceSaltBase64?.let { Base64.decode(it, Base64.NO_WRAP) }
+            
+            notesList.forEach { noteData ->
+                val title = noteData["title"] as String
+                val content = noteData["content"] as String
+                val timestamp = when (val ts = noteData["timestamp"]) {
+                    is Double -> ts.toLong()
+                    is Number -> ts.toLong()
+                    else -> System.currentTimeMillis()
+                }
+                
+                val encryptedContent = if (needsReEncrypt && sourceSalt != null) {
+                    // Decrypt with source phone's salt, then re-encrypt with local phone's salt
+                    try {
+                        val plaintext = EncryptionManager.decrypt(content, password, sourceSalt)
+                        EncryptionManager.encrypt(plaintext, password, localSalt)
+                    } catch (e: Exception) {
+                        Log.e(TAG, "E009: Re-encryption failed for note '$title' - ${e.message}", e)
+                        // Try inserting as-is (might be v1 format on same phone)
+                        content
+                    }
+                } else {
+                    content
+                }
+                
                 val note = NoteEntity(
-                    title = data["title"] as String,
-                    encryptedContent = data["content"] as String,
-                    timestamp = (data["timestamp"] as Double).toLong(),
+                    title = title,
+                    encryptedContent = encryptedContent,
+                    timestamp = timestamp,
                     syncStatus = 0
                 )
                 noteDao.insertNote(note)

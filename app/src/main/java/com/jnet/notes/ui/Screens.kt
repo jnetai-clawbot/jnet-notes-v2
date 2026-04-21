@@ -5,6 +5,7 @@ import android.content.Intent
 import android.widget.Toast
 import android.util.Log
 import android.net.Uri
+import android.content.pm.PackageManager
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
@@ -674,8 +675,68 @@ fun SettingsScreen(
             // About section
             Text("About", style = MaterialTheme.typography.h6)
             Spacer(modifier = Modifier.height(8.dp))
-            Text("Secure Notes ©️ J~Net 2026", style = MaterialTheme.typography.body1)
+            
+            // Version display
+            val packageInfo = try { context.packageManager.getPackageInfo(context.packageName, 0) } catch (_: Exception) { null }
+            val versionDisplay = packageInfo?.let { "v${it.versionName} (${it.versionCode})" } ?: "v1.0"
+            Text("Secure Notes $versionDisplay ©️ J~Net 2026", style = MaterialTheme.typography.body1)
             Text("jnetai.com", style = MaterialTheme.typography.body2, color = MaterialTheme.colors.primary)
+            Spacer(modifier = Modifier.height(16.dp))
+
+            // Check for Updates button
+            var updateStatus by remember { mutableStateOf("") }
+            var isChecking by remember { mutableStateOf(false) }
+            
+            OutlinedButton(
+                onClick = {
+                    isChecking = true
+                    updateStatus = ""
+                    scope.launch {
+                        try {
+                            val result = withContext(Dispatchers.IO) {
+                                val url = java.net.URL("https://api.github.com/repos/jnetai-clawbot/jnet-notes-v2/releases/latest")
+                                val conn = url.openConnection() as java.net.HttpURLConnection
+                                conn.requestMethod = "GET"
+                                conn.setRequestProperty("Accept", "application/vnd.github.v3+json")
+                                conn.connectTimeout = 10000
+                                conn.readTimeout = 10000
+                                val response = conn.inputStream.bufferedReader().readText()
+                                conn.disconnect()
+                                val gson = com.google.gson.Gson()
+                                val release = gson.fromJson(response, Map::class.java)
+                                release["tag_name"] as? String ?: "unknown"
+                            }
+                            updateStatus = "Latest release: $result"
+                        } catch (e: Exception) {
+                            Log.e(TAG, "Update check failed: ${e.message}", e)
+                            updateStatus = "Check failed: ${e.message}"
+                        }
+                        isChecking = false
+                    }
+                },
+                modifier = Modifier.fillMaxWidth().padding(vertical = 8.dp),
+                enabled = !isChecking
+            ) {
+                if (isChecking) {
+                    CircularProgressIndicator(color = MaterialTheme.colors.onPrimary, modifier = Modifier.size(20.dp))
+                } else {
+                    Text("Check for Updates")
+                }
+            }
+            
+            if (updateStatus.isNotEmpty()) {
+                val isUpdate = !updateStatus.contains("failed") && !updateStatus.startsWith("Check")
+                Text(updateStatus, color = if (isUpdate) MaterialTheme.colors.primary else MaterialTheme.colors.error)
+                if (isUpdate) {
+                    TextButton(onClick = {
+                        val intent = Intent(Intent.ACTION_VIEW, Uri.parse("https://github.com/jnetai-clawbot/jnet-notes-v2/releases/latest"))
+                        context.startActivity(intent)
+                    }) {
+                        Text("Download Update →")
+                    }
+                }
+            }
+            
             Spacer(modifier = Modifier.height(16.dp))
 
             // Share App button
@@ -687,7 +748,7 @@ fun SettingsScreen(
                         putExtra(Intent.EXTRA_SUBJECT, "Secure Notes App")
                         putExtra(Intent.EXTRA_TEXT, "Check out Secure Notes — encrypted notes app for Android\nhttps://github.com/jnetai-clawbot/jnet-notes-v2/releases/latest")
                     }
-                    context.startActivity(Intent.createChooser(shareIntent, "Share J~Net Notes via..."))
+                    context.startActivity(Intent.createChooser(shareIntent, "Share Secure Notes via..."))
                 },
                 modifier = Modifier.fillMaxWidth().padding(vertical = 8.dp)
             ) {
