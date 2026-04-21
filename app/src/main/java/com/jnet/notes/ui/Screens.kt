@@ -684,8 +684,8 @@ fun SettingsScreen(
                     val shareIntent = Intent().apply {
                         action = Intent.ACTION_SEND
                         type = "text/plain"
-                        putExtra(Intent.EXTRA_SUBJECT, "J~Net Secure Notes App")
-                        putExtra(Intent.EXTRA_TEXT, "Check out J~Net Secure Notes — encrypted notes app for Android\nhttps://github.com/jnetai-clawbot/jnet-notes-v2/releases/latest")
+                        putExtra(Intent.EXTRA_SUBJECT, "Secure Notes App")
+                        putExtra(Intent.EXTRA_TEXT, "Check out Secure Notes — encrypted notes app for Android\nhttps://github.com/jnetai-clawbot/jnet-notes-v2/releases/latest")
                     }
                     context.startActivity(Intent.createChooser(shareIntent, "Share J~Net Notes via..."))
                 },
