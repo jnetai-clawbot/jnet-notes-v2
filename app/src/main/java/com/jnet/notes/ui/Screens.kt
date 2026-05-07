@@ -407,7 +407,7 @@ fun NoteEditScreen(
                         }
                         
                         // Separator before clipboard history
-                        HorizontalDivider()
+                        Divider()
                         Text(
                             "Clipboard history",
                             style = MaterialTheme.typography.caption,
