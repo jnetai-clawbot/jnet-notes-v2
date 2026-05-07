@@ -344,6 +344,7 @@ fun NoteEditScreen(
                     modifier = Modifier.fillMaxWidth().weight(1f),
                     maxLines = Int.MAX_VALUE
                 )
+                }
                 
                 Spacer(modifier = Modifier.height(16.dp))
 
@@ -399,8 +400,7 @@ fun NoteEditScreen(
                             val clipboard = context.getSystemService(Context.CLIPBOARD_SERVICE) as android.content.ClipboardManager
                             val clip = android.content.ClipData.newPlainText("Note", content)
                             clipboard.setPrimaryClip(clip)
-                            ClipboardHistory.push(content)
-                            Toast.makeText(context, "📋 Copied", Toast.LENGTH_SHORT).show()
+                            Toast.makeText(context, "Copied to clipboard", Toast.LENGTH_SHORT).show()
                         },
                         modifier = Modifier.weight(1f).padding(horizontal = 4.dp)
                     ) {
@@ -421,68 +421,10 @@ fun NoteEditScreen(
                     ) {
                         Text("Share")
                     }
-                    
-                    // Clipboard history button
-                    var showClipHistory by remember { mutableStateOf(false) }
-                    Box {
-                        OutlinedButton(
-                            onClick = { showClipHistory = true },
-                            modifier = Modifier.weight(1f).padding(horizontal = 4.dp)
-                        ) {
-                            Text("🗂️ Clipboard")
-                        }
-                        DropdownMenu(
-                            expanded = showClipHistory,
-                            onDismissRequest = { showClipHistory = false }
-                        ) {
-                            val clipboard = context.getSystemService(Context.CLIPBOARD_SERVICE) as android.content.ClipboardManager
-                            val primaryClip = clipboard.primaryClip
-                            val hasClip = primaryClip != null && primaryClip.itemCount > 0
-                            val clipText = if (hasClip) primaryClip!!.getItemAt(0).text?.toString() ?: "" else ""
-                            
-                            if (ClipboardHistory.items.isEmpty() && !hasClip) {
-                                DropdownMenuItem(onClick = { showClipHistory = false }) {
-                                    Text("No clipboard history", color = MaterialTheme.colors.onSurface.copy(alpha = 0.4f))
-                                }
-                            } else {
-                                if (hasClip && clipText.isNotBlank()) {
-                                    DropdownMenuItem(onClick = {
-                                        showClipHistory = false
-                                        content = clipText
-                                        Toast.makeText(context, "📎 Pasted", Toast.LENGTH_SHORT).show()
-                                    }) {
-                                        Text("📎 System: " + clipText.take(40).replace("\n", " ") + if (clipText.length > 40) "..." else "",
-                                            maxLines = 1)
-                                    }
-                                    Divider()
-                                }
-                                ClipboardHistory.items.forEach { item ->
-                                    DropdownMenuItem(onClick = {
-                                        showClipHistory = false
-                                        content = item
-                                        Toast.makeText(context, "📎 Pasted", Toast.LENGTH_SHORT).show()
-                                    }) {
-                                        Text(
-                                            item.take(60).replace("\n", " ") + if (item.length > 60) "..." else "",
-                                            maxLines = 1
-                                        )
-                                    }
-                                }
-                            }
-                            Divider()
-                            DropdownMenuItem(onClick = {
-                                ClipboardHistory.clear()
-                                showClipHistory = false
-                            }) {
-                                Text("Clear history", color = MaterialTheme.colors.error)
-                            }
-                        }
-                    }
                 }
             }
         }
     }
-}
 
 @Composable
 fun LoginScreen(userDao: UserDao, onLoginSuccess: (String) -> Unit) {
