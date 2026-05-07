@@ -5,8 +5,8 @@ import android.content.Intent
 import android.widget.Toast
 import android.util.Log
 import android.net.Uri
-import android.content.pm.PackageManager
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.gestures.detectTapGestures
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
@@ -21,6 +21,7 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.input.PasswordVisualTransformation
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.unit.sp
 import com.jnet.notes.repository.NotesRepository
 import com.jnet.notes.data.local.NoteEntity
 import com.jnet.notes.data.local.UserCredsEntity
@@ -28,6 +29,8 @@ import com.jnet.notes.data.local.UserDao
 import com.jnet.notes.security.EncryptionManager
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.setValue
+import androidx.compose.ui.input.pointer.pointerInput
+import androidx.compose.ui.unit.IntOffset
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 import kotlinx.coroutines.launch
@@ -315,13 +318,106 @@ fun NoteEditScreen(
                 )
                 Spacer(modifier = Modifier.height(12.dp))
 
-                OutlinedTextField(
-                    value = content,
-                    onValueChange = { content = it },
-                    label = { Text("Note content") },
-                    modifier = Modifier.fillMaxWidth().weight(1f),
-                    maxLines = Int.MAX_VALUE
-                )
+                // Content field with long-press context menu (Copy, Paste, Clipboard)
+                var showContentMenu by remember { mutableStateOf(false) }
+                var menuOffset by remember { mutableStateOf(IntOffset(0, 0)) }
+                
+                Box(modifier = Modifier.fillMaxWidth().weight(1f)) {
+                    OutlinedTextField(
+                        value = content,
+                        onValueChange = { content = it },
+                        label = { Text("Note content") },
+                        modifier = Modifier
+                            .fillMaxSize()
+                            .pointerInput(Unit) {
+                                detectTapGestures(
+                                    onLongPress = { offset ->
+                                        menuOffset = IntOffset(offset.x.toInt(), offset.y.toInt())
+                                        showContentMenu = true
+                                    }
+                                )
+                            },
+                        maxLines = Int.MAX_VALUE
+                    )
+                    
+                    DropdownMenu(
+                        expanded = showContentMenu,
+                        onDismissRequest = { showContentMenu = false },
+                        offset = menuOffset
+                    ) {
+                        val clipboard = context.getSystemService(Context.CLIPBOARD_SERVICE) as android.content.ClipboardManager
+                        
+                        // Copy option
+                        DropdownMenuItem(onClick = {
+                            showContentMenu = false
+                            val clip = android.content.ClipData.newPlainText("Note", content)
+                            clipboard.setPrimaryClip(clip)
+                            Toast.makeText(context, "Copied to clipboard", Toast.LENGTH_SHORT).show()
+                        }) {
+                            Row(verticalAlignment = Alignment.CenterVertically) {
+                                Text("📋", fontSize = 16.sp)
+                                Spacer(Modifier.width(8.dp))
+                                Text("Copy")
+                            }
+                        }
+                        
+                        // Paste / Clipboard option
+                        val clipData = clipboard.primaryClip
+                        val hasClipItem = clipData != null && clipData.itemCount > 0
+                        val clipText = if (hasClipItem) clipData!!.getItemAt(0).text?.toString() ?: "" else ""
+                        
+                        if (hasClipItem && clipText.isNotBlank()) {
+                            // Paste option
+                            DropdownMenuItem(onClick = {
+                                showContentMenu = false
+                                content = clipText
+                                Toast.makeText(context, "Pasted from clipboard", Toast.LENGTH_SHORT).show()
+                            }) {
+                                Row(verticalAlignment = Alignment.CenterVertically) {
+                                    Text("📎", fontSize = 16.sp)
+                                    Spacer(Modifier.width(8.dp))
+                                    Text("Paste")
+                                }
+                            }
+                            // Clipboard item preview
+                            DropdownMenuItem(onClick = {
+                                showContentMenu = false
+                                content = clipText
+                                Toast.makeText(context, "Pasted from clipboard", Toast.LENGTH_SHORT).show()
+                            }) {
+                                Row(verticalAlignment = Alignment.CenterVertically) {
+                                    Text("🗂️", fontSize = 16.sp)
+                                    Spacer(Modifier.width(8.dp))
+                                    Column {
+                                        Text("Clipboard", style = MaterialTheme.typography.body1)
+                                        Text(
+                                            clipText.take(50) + if (clipText.length > 50) "..." else "",
+                                            style = MaterialTheme.typography.caption,
+                                            color = MaterialTheme.colors.onSurface.copy(alpha = 0.5f),
+                                            maxLines = 1
+                                        )
+                                    }
+                                }
+                            }
+                        } else {
+                            // Clipboard empty indicator
+                            DropdownMenuItem(onClick = { showContentMenu = false }) {
+                                Row(verticalAlignment = Alignment.CenterVertically) {
+                                    Text("🗂️", fontSize = 16.sp)
+                                    Spacer(Modifier.width(8.dp))
+                                    Column {
+                                        Text("Clipboard", style = MaterialTheme.typography.body1)
+                                        Text(
+                                            "Empty",
+                                            style = MaterialTheme.typography.caption,
+                                            color = MaterialTheme.colors.onSurface.copy(alpha = 0.5f)
+                                        )
+                                    }
+                                }
+                            }
+                        }
+                    }
+                }
                 Spacer(modifier = Modifier.height(16.dp))
 
                 Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceEvenly) {
