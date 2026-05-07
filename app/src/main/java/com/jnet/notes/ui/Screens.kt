@@ -54,27 +54,6 @@ object ClipboardHistory {
     fun clear() { _items.clear() }
 }
 
-
-/**
- * In-app clipboard history — stores items the user copies/cuts so they can
- * pick from multiple items when pasting. Android's ClipboardManager only
- * exposes the most recent item, so we build our own local history.
- */
-object ClipboardHistory {
-    private val _items = mutableListOf<String>()
-    val items: List<String> get() = _items.toList()
-    private const val MAX_ITEMS = 10
-    
-    fun push(text: String) {
-        if (text.isBlank()) return
-        if (_items.contains(text)) _items.remove(text)
-        _items.add(0, text)
-        while (_items.size > MAX_ITEMS) _items.removeAt(_items.lastIndex)
-    }
-    
-    fun clear() { _items.clear() }
-}
-
 private const val TAG = "JNetNotes"
 
 object Err {
@@ -511,8 +490,7 @@ fun NoteEditScreen(
                             val clipboard = context.getSystemService(Context.CLIPBOARD_SERVICE) as android.content.ClipboardManager
                             val clip = android.content.ClipData.newPlainText("Note", content)
                             clipboard.setPrimaryClip(clip)
-                            ClipboardHistory.push(content)
-                            Toast.makeText(context, "📋 Copied", Toast.LENGTH_SHORT).show()
+                            Toast.makeText(context, "Copied to clipboard", Toast.LENGTH_SHORT).show()
                         },
                         modifier = Modifier.weight(1f).padding(horizontal = 4.dp)
                     ) {
@@ -532,47 +510,6 @@ fun NoteEditScreen(
                         modifier = Modifier.weight(1f).padding(horizontal = 4.dp)
                     ) {
                         Text("Share")
-                    }
-                    
-                    // Clipboard history button
-                    var showClipHistory by remember { mutableStateOf(false) }
-                    Box {
-                        OutlinedButton(
-                            onClick = { showClipHistory = true },
-                            modifier = Modifier.weight(1f).padding(horizontal = 4.dp)
-                        ) {
-                            Text("🗂️ Clipboard")
-                        }
-                        DropdownMenu(
-                            expanded = showClipHistory,
-                            onDismissRequest = { showClipHistory = false }
-                        ) {
-                            if (ClipboardHistory.items.isEmpty()) {
-                                DropdownMenuItem(onClick = { showClipHistory = false }) {
-                                    Text("No clipboard history", color = MaterialTheme.colors.onSurface.copy(alpha = 0.4f))
-                                }
-                            } else {
-                                ClipboardHistory.items.forEach { item ->
-                                    DropdownMenuItem(onClick = {
-                                        showClipHistory = false
-                                        content = item
-                                        Toast.makeText(context, "📎 Pasted", Toast.LENGTH_SHORT).show()
-                                    }) {
-                                        Text(
-                                            item.take(60).replace("\n", " ") + if (item.length > 60) "..." else "",
-                                            maxLines = 1
-                                        )
-                                    }
-                                }
-                            }
-                            Divider()
-                            DropdownMenuItem(onClick = {
-                                ClipboardHistory.clear()
-                                showClipHistory = false
-                            }) {
-                                Text("Clear history", color = MaterialTheme.colors.error)
-                            }
-                        }
                     }
                 }
             }
