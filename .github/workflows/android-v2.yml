@@ -24,7 +24,7 @@ jobs:
         run: chmod +x gradlew
 
       - name: Build with Gradle
-        run: ./gradlew assembleRelease
+        run: ./gradlew clean assembleRelease --no-daemon --stacktrace 2>&1 | tail -50
 
       - name: List APK outputs
         run: find app/build/outputs/apk -name '*.apk' -type f
