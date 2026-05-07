@@ -342,7 +342,7 @@ fun NoteEditScreen(
                     label = { Text("Note content") },
                     modifier = Modifier.fillMaxWidth().weight(1f),
                     maxLines = Int.MAX_VALUE
-                )                }
+                )
                 
                 Spacer(modifier = Modifier.height(16.dp))
 
