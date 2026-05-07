@@ -351,6 +351,17 @@ fun NoteEditScreen(
                         val hasClip = primaryClip != null && primaryClip.itemCount > 0
                         val clipText = if (hasClip) primaryClip!!.getItemAt(0).text?.toString() ?: "" else ""
 
+                        // Cut
+                        DropdownMenuItem(onClick = {
+                            showContextMenu = false
+                            val clip = android.content.ClipData.newPlainText("Note", content)
+                            clipboard.setPrimaryClip(clip)
+                            content = ""
+                            Toast.makeText(context, "✂️ Cut", Toast.LENGTH_SHORT).show()
+                        }) {
+                            Text("✂️ Cut")
+                        }
+                        
                         // Copy
                         DropdownMenuItem(onClick = {
                             showContextMenu = false
