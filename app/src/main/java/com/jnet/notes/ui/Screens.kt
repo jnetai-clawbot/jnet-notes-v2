@@ -336,7 +336,6 @@ fun NoteEditScreen(
                     singleLine = true
                 )
                 Spacer(modifier = Modifier.height(12.dp))
-
                 OutlinedTextField(
                     value = content,
                     onValueChange = { content = it },
@@ -399,7 +398,8 @@ fun NoteEditScreen(
                             val clipboard = context.getSystemService(Context.CLIPBOARD_SERVICE) as android.content.ClipboardManager
                             val clip = android.content.ClipData.newPlainText("Note", content)
                             clipboard.setPrimaryClip(clip)
-                            Toast.makeText(context, "Copied to clipboard", Toast.LENGTH_SHORT).show()
+                            ClipboardHistory.push(content)
+                            Toast.makeText(context, "📋 Copied", Toast.LENGTH_SHORT).show()
                         },
                         modifier = Modifier.weight(1f).padding(horizontal = 4.dp)
                     ) {
@@ -444,20 +444,17 @@ fun NoteEditScreen(
                                     Text("No clipboard history", color = MaterialTheme.colors.onSurface.copy(alpha = 0.4f))
                                 }
                             } else {
-                                // System clipboard (most recent)
                                 if (hasClip && clipText.isNotBlank()) {
                                     DropdownMenuItem(onClick = {
                                         showClipHistory = false
                                         content = clipText
                                         Toast.makeText(context, "📎 Pasted", Toast.LENGTH_SHORT).show()
                                     }) {
-                                        Text("📎 System clipboard: " + clipText.take(40).replace("\n", " ") + if (clipText.length > 40) "..." else "",
+                                        Text("📎 System: " + clipText.take(40).replace("\n", " ") + if (clipText.length > 40) "..." else "",
                                             maxLines = 1)
                                     }
                                     Divider()
                                 }
-                                
-                                // Local clipboard history
                                 ClipboardHistory.items.forEach { item ->
                                     DropdownMenuItem(onClick = {
                                         showClipHistory = false
