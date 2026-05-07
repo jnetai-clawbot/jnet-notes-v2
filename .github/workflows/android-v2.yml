@@ -24,7 +24,14 @@ jobs:
         run: chmod +x gradlew
 
       - name: Build with Gradle
-        run: ./gradlew assembleRelease
+        run: ./gradlew assembleRelease --stacktrace 2>&1 | tee gradle-output.log
+
+      - name: Upload Gradle logs
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: gradle-logs
+          path: gradle-output.log
 
       - name: List APK outputs
         run: find app/build/outputs/apk -name '*.apk' -type f
