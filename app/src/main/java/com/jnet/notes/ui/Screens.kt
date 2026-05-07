@@ -248,8 +248,6 @@ fun NoteEditScreen(
     var isLoading by remember { mutableStateOf(noteId != null) }
     var error by remember { mutableStateOf("") }
     var showDeleteConfirm by remember { mutableStateOf(false) }
-    var showClipboardHistory by remember { mutableStateOf(false) }
-    var showContextMenu by remember { mutableStateOf(false) }
 
     if (noteId != null && isLoading) {
         LaunchedEffect(noteId) {
@@ -315,9 +313,6 @@ fun NoteEditScreen(
                             Text("Delete", color = MaterialTheme.colors.error)
                         }
                     }
-                    TextButton(onClick = { showContextMenu = true }) {
-                        Text("📋", color = Color.White)
-                    }
                 }
             )
         }
@@ -349,8 +344,6 @@ fun NoteEditScreen(
                     modifier = Modifier.fillMaxWidth().weight(1f),
                     maxLines = Int.MAX_VALUE
                 )
-                }
-                
                 Spacer(modifier = Modifier.height(16.dp))
 
                 Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceEvenly) {
@@ -394,111 +387,25 @@ fun NoteEditScreen(
                         ) {
                             Text("Revert")
                         }
-                    } else {
-                        Spacer(modifier = Modifier.weight(1f))
                     }
-                }
-
-                // Context menu dialog (triggered by 📋 toolbar button)
-                if (showContextMenu) {
-                    AlertDialog(
-                        onDismissRequest = { showContextMenu = false },
-                        title = { Text("Options") },
-                        text = {
-                            Column {
-                                if (content.isNotEmpty()) {
-                                    TextButton(onClick = {
-                                        ClipboardHistory.push(content)
-                                        val cm = context.getSystemService(Context.CLIPBOARD_SERVICE) as android.content.ClipboardManager
-                                        cm.setPrimaryClip(android.content.ClipData.newPlainText("Note", content))
-                                        content = ""
-                                        showContextMenu = false
-                                        Toast.makeText(context, "Cut", Toast.LENGTH_SHORT).show()
-                                    }, modifier = Modifier.fillMaxWidth()) {
-                                        Text("✂️ Cut")
-                                    }
-                                    TextButton(onClick = {
-                                        ClipboardHistory.push(content)
-                                        val cm = context.getSystemService(Context.CLIPBOARD_SERVICE) as android.content.ClipboardManager
-                                        cm.setPrimaryClip(android.content.ClipData.newPlainText("Note", content))
-                                        showContextMenu = false
-                                        Toast.makeText(context, "Copied to clipboard", Toast.LENGTH_SHORT).show()
-                                    }, modifier = Modifier.fillMaxWidth()) {
-                                        Text("📋 Copy")
-                                    }
-                                    Divider()
-                                }
-                                TextButton(onClick = {
-                                    val cm = context.getSystemService(Context.CLIPBOARD_SERVICE) as android.content.ClipboardManager
-                                    val cd = cm.primaryClip
-                                    if (cd != null && cd.itemCount > 0) {
-                                        val pasted = cd.getItemAt(0).text?.toString() ?: ""
-                                        if (pasted.isNotBlank()) {
-                                            content += pasted
-                                            ClipboardHistory.push(pasted)
-                                        }
-                                    }
-                                    showContextMenu = false
-                                }, modifier = Modifier.fillMaxWidth()) {
-                                    Text("📎 Paste")
-                                }
-                                Divider()
-                                TextButton(onClick = {
-                                    showContextMenu = false
-                                    showClipboardHistory = true
-                                }, modifier = Modifier.fillMaxWidth()) {
-                                    Text("🗂️ Clipboard")
-                                }
-                            }
-                        },
-                        confirmButton = {
-                            TextButton(onClick = { showContextMenu = false }) {
-                                Text("Cancel")
-                            }
-                        }
-                    )
-                }
-
-                // Clipboard history dialog
-                if (showClipboardHistory) {
-                    AlertDialog(
-                        onDismissRequest = { showClipboardHistory = false },
-                        title = { Text("Clipboard History") },
-                        text = {
-                            if (ClipboardHistory.items.isEmpty()) {
-                                Text("No clipboard items yet.")
-                            } else {
-                                LazyColumn(modifier = Modifier.heightIn(max = 300.dp)) {
-                                    items(ClipboardHistory.items) { item ->
-                                        TextButton(
-                                            onClick = {
-                                                content += item
-                                                showClipboardHistory = false
-                                            },
-                                            modifier = Modifier.fillMaxWidth()
-                                        ) {
-                                            Text(
-                                                text = item.take(80) + if (item.length > 80) "..." else "",
-                                                maxLines = 2
-                                            )
-                                        }
-                                        Divider()
-                                    }
-                                }
-                            }
-                        },
-                        confirmButton = {
-                            TextButton(onClick = { showClipboardHistory = false }) {
-                                Text("Close")
-                            }
-                        }
-                    )
                 }
 
                 Spacer(modifier = Modifier.height(8.dp))
 
-                // Share button only — clipboard moved to context menu
                 Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceEvenly) {
+                    OutlinedButton(
+                        onClick = {
+                            val clipboard = context.getSystemService(Context.CLIPBOARD_SERVICE) as android.content.ClipboardManager
+                            val clip = android.content.ClipData.newPlainText("Note", content)
+                            clipboard.setPrimaryClip(clip)
+                            ClipboardHistory.push(content)
+                            Toast.makeText(context, "📋 Copied", Toast.LENGTH_SHORT).show()
+                        },
+                        modifier = Modifier.weight(1f).padding(horizontal = 4.dp)
+                    ) {
+                        Text("Copy")
+                    }
+
                     OutlinedButton(
                         onClick = {
                             val shareIntent = Intent().apply {
@@ -513,10 +420,52 @@ fun NoteEditScreen(
                     ) {
                         Text("Share")
                     }
+                    
+                    // Clipboard history button
+                    var showClipHistory by remember { mutableStateOf(false) }
+                    Box {
+                        OutlinedButton(
+                            onClick = { showClipHistory = true },
+                            modifier = Modifier.weight(1f).padding(horizontal = 4.dp)
+                        ) {
+                            Text("🗂️ Clipboard")
+                        }
+                        DropdownMenu(
+                            expanded = showClipHistory,
+                            onDismissRequest = { showClipHistory = false }
+                        ) {
+                            if (ClipboardHistory.items.isEmpty()) {
+                                DropdownMenuItem(onClick = { showClipHistory = false }) {
+                                    Text("No clipboard history", color = MaterialTheme.colors.onSurface.copy(alpha = 0.4f))
+                                }
+                            } else {
+                                ClipboardHistory.items.forEach { item ->
+                                    DropdownMenuItem(onClick = {
+                                        showClipHistory = false
+                                        content = item
+                                        Toast.makeText(context, "📎 Pasted", Toast.LENGTH_SHORT).show()
+                                    }) {
+                                        Text(
+                                            item.take(60).replace("\n", " ") + if (item.length > 60) "..." else "",
+                                            maxLines = 1
+                                        )
+                                    }
+                                }
+                            }
+                            Divider()
+                            DropdownMenuItem(onClick = {
+                                ClipboardHistory.clear()
+                                showClipHistory = false
+                            }) {
+                                Text("Clear history", color = MaterialTheme.colors.error)
+                            }
+                        }
+                    }
                 }
             }
         }
     }
+}
 
 @Composable
 fun LoginScreen(userDao: UserDao, onLoginSuccess: (String) -> Unit) {
@@ -872,3 +821,4 @@ fun SettingsScreen(
         }
     }
 }
+
