@@ -363,10 +363,10 @@ fun NoteEditScreen(
                     }
                     
                     // Clipboard preview button
-                    Box {
+                    Box(modifier = Modifier.weight(1f)) {
                         TextButton(
                             onClick = { showClipMenu = !showClipMenu },
-                            modifier = Modifier.weight(1f)
+                            modifier = Modifier.fillMaxWidth()
                         ) {
                             Text(
                                 if (hasClip && clipText.isNotBlank())
