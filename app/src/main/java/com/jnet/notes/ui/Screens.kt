@@ -34,6 +34,26 @@ import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 import kotlinx.coroutines.launch
 
+/**
+ * In-app clipboard history — stores items the user copies/cuts so they can
+ * pick from multiple items when pasting. Android's ClipboardManager only
+ * exposes the most recent item, so we build our own local history.
+ */
+object ClipboardHistory {
+    private val _items = mutableListOf<String>()
+    val items: List<String> get() = _items.toList()
+    private const val MAX_ITEMS = 10
+    
+    fun push(text: String) {
+        if (text.isBlank()) return
+        if (_items.contains(text)) _items.remove(text)
+        _items.add(0, text)
+        while (_items.size > MAX_ITEMS) _items.removeAt(_items.lastIndex)
+    }
+    
+    fun clear() { _items.clear() }
+}
+
 private const val TAG = "JNetNotes"
 
 object Err {
@@ -356,6 +376,7 @@ fun NoteEditScreen(
                             showContextMenu = false
                             val clip = android.content.ClipData.newPlainText("Note", content)
                             clipboard.setPrimaryClip(clip)
+                            ClipboardHistory.push(content)
                             content = ""
                             Toast.makeText(context, "✂️ Cut", Toast.LENGTH_SHORT).show()
                         }) {
@@ -367,53 +388,48 @@ fun NoteEditScreen(
                             showContextMenu = false
                             val clip = android.content.ClipData.newPlainText("Note", content)
                             clipboard.setPrimaryClip(clip)
+                            ClipboardHistory.push(content)
                             Toast.makeText(context, "📋 Copied", Toast.LENGTH_SHORT).show()
                         }) {
                             Text("📋 Copy")
                         }
                         
+                        // Paste (latest clipboard item)
                         if (hasClip && clipText.isNotBlank()) {
-                            // Paste
                             DropdownMenuItem(onClick = {
                                 showContextMenu = false
                                 content = clipText
+                                ClipboardHistory.push(clipText)
                                 Toast.makeText(context, "📎 Pasted", Toast.LENGTH_SHORT).show()
                             }) {
                                 Text("📎 Paste")
                             }
-                            
-                            // Clipboard with preview
-                            DropdownMenuItem(onClick = {
-                                showContextMenu = false
-                                content = clipText
-                                Toast.makeText(context, "📎 Pasted", Toast.LENGTH_SHORT).show()
-                            }) {
-                                Row(verticalAlignment = Alignment.CenterVertically) {
-                                    Text("🗂️ ", fontSize = 16.sp)
-                                    Column {
-                                        Text("Clipboard", style = MaterialTheme.typography.body1)
-                                        Text(
-                                            clipText.take(40).replace("\n", " ") + if (clipText.length > 40) "..." else "",
-                                            style = MaterialTheme.typography.caption,
-                                            color = MaterialTheme.colors.onSurface.copy(alpha = 0.5f),
-                                            maxLines = 1
-                                        )
-                                    }
-                                }
+                        }
+                        
+                        // Separator before clipboard history
+                        HorizontalDivider()
+                        Text(
+                            "Clipboard history",
+                            style = MaterialTheme.typography.caption,
+                            color = MaterialTheme.colors.onSurface.copy(alpha = 0.5f),
+                            modifier = Modifier.padding(horizontal = 16.dp, vertical = 4.dp)
+                        )
+                        
+                        if (ClipboardHistory.items.isEmpty()) {
+                            DropdownMenuItem(onClick = { showContextMenu = false }) {
+                                Text("Empty", color = MaterialTheme.colors.onSurface.copy(alpha = 0.4f))
                             }
                         } else {
-                            // Clipboard empty
-                            DropdownMenuItem(onClick = { showContextMenu = false }) {
-                                Row(verticalAlignment = Alignment.CenterVertically) {
-                                    Text("🗂️ ", fontSize = 16.sp)
-                                    Column {
-                                        Text("Clipboard", style = MaterialTheme.typography.body1)
-                                        Text(
-                                            "Empty",
-                                            style = MaterialTheme.typography.caption,
-                                            color = MaterialTheme.colors.onSurface.copy(alpha = 0.5f)
-                                        )
-                                    }
+                            ClipboardHistory.items.forEach { item ->
+                                DropdownMenuItem(onClick = {
+                                    showContextMenu = false
+                                    content = item
+                                    Toast.makeText(context, "📎 Pasted from clipboard", Toast.LENGTH_SHORT).show()
+                                }) {
+                                    Text(
+                                        item.take(60).replace("\n", " ") + if (item.length > 60) "..." else "",
+                                        maxLines = 1
+                                    )
                                 }
                             }
                         }
