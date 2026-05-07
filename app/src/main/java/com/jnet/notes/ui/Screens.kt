@@ -6,7 +6,6 @@ import android.widget.Toast
 import android.util.Log
 import android.net.Uri
 import androidx.compose.foundation.clickable
-import androidx.compose.foundation.gestures.detectTapGestures
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
@@ -29,8 +28,6 @@ import com.jnet.notes.data.local.UserDao
 import com.jnet.notes.security.EncryptionManager
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.setValue
-import androidx.compose.ui.input.pointer.pointerInput
-import androidx.compose.ui.unit.IntOffset
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 import kotlinx.coroutines.launch
@@ -318,101 +315,90 @@ fun NoteEditScreen(
                 )
                 Spacer(modifier = Modifier.height(12.dp))
 
-                // Content field with long-press context menu (Copy, Paste, Clipboard)
-                var showContentMenu by remember { mutableStateOf(false) }
-                var menuOffset by remember { mutableStateOf(IntOffset(0, 0)) }
+                OutlinedTextField(
+                    value = content,
+                    onValueChange = { content = it },
+                    label = { Text("Note content") },
+                    modifier = Modifier.fillMaxWidth().weight(1f),
+                    maxLines = Int.MAX_VALUE
+                )
                 
-                Box(modifier = Modifier.fillMaxWidth().weight(1f)) {
-                    OutlinedTextField(
-                        value = content,
-                        onValueChange = { content = it },
-                        label = { Text("Note content") },
-                        modifier = Modifier
-                            .fillMaxSize()
-                            .pointerInput(Unit) {
-                                detectTapGestures(
-                                    onLongPress = { offset ->
-                                        menuOffset = IntOffset(offset.x.toInt(), offset.y.toInt())
-                                        showContentMenu = true
-                                    }
-                                )
-                            },
-                        maxLines = Int.MAX_VALUE
-                    )
-                    
-                    DropdownMenu(
-                        expanded = showContentMenu,
-                        onDismissRequest = { showContentMenu = false },
-                        offset = menuOffset
-                    ) {
-                        val clipboard = context.getSystemService(Context.CLIPBOARD_SERVICE) as android.content.ClipboardManager
-                        
-                        // Copy option
-                        DropdownMenuItem(onClick = {
-                            showContentMenu = false
+                // Clipboard action bar: Copy | Paste | Clipboard preview
+                Spacer(modifier = Modifier.height(4.dp))
+                var showClipMenu by remember { mutableStateOf(false) }
+                val clipboardManager = context.getSystemService(Context.CLIPBOARD_SERVICE) as android.content.ClipboardManager
+                val primaryClip = clipboardManager.primaryClip
+                val hasClip = primaryClip != null && primaryClip.itemCount > 0
+                val clipText = if (hasClip) primaryClip!!.getItemAt(0).text?.toString() ?: "" else ""
+                
+                Row(
+                    modifier = Modifier.fillMaxWidth().padding(horizontal = 4.dp, vertical = 2.dp),
+                    horizontalArrangement = Arrangement.SpaceEvenly
+                ) {
+                    // Copy button
+                    TextButton(
+                        onClick = {
                             val clip = android.content.ClipData.newPlainText("Note", content)
-                            clipboard.setPrimaryClip(clip)
-                            Toast.makeText(context, "Copied to clipboard", Toast.LENGTH_SHORT).show()
-                        }) {
-                            Row(verticalAlignment = Alignment.CenterVertically) {
-                                Text("📋", fontSize = 16.sp)
-                                Spacer(Modifier.width(8.dp))
-                                Text("Copy")
+                            clipboardManager.setPrimaryClip(clip)
+                            Toast.makeText(context, "📋 Copied", Toast.LENGTH_SHORT).show()
+                        },
+                        modifier = Modifier.weight(1f)
+                    ) {
+                        Text("📋 Copy", fontSize = 13.sp)
+                    }
+                    
+                    // Paste button
+                    TextButton(
+                        onClick = {
+                            if (hasClip && clipText.isNotBlank()) {
+                                content = clipText
+                                Toast.makeText(context, "📎 Pasted", Toast.LENGTH_SHORT).show()
+                            } else {
+                                Toast.makeText(context, "📎 Clipboard empty", Toast.LENGTH_SHORT).show()
                             }
+                        },
+                        modifier = Modifier.weight(1f)
+                    ) {
+                        Text("📎 Paste", fontSize = 13.sp)
+                    }
+                    
+                    // Clipboard preview button
+                    Box {
+                        TextButton(
+                            onClick = { showClipMenu = !showClipMenu },
+                            modifier = Modifier.weight(1f)
+                        ) {
+                            Text(
+                                if (hasClip && clipText.isNotBlank())
+                                    "🗂️ " + clipText.take(12).replace("\n", " ") + (if (clipText.length > 12) ".." else "")
+                                else
+                                    "🗂️ Empty",
+                                fontSize = 13.sp
+                            )
                         }
-                        
-                        // Paste / Clipboard option
-                        val clipData = clipboard.primaryClip
-                        val hasClipItem = clipData != null && clipData.itemCount > 0
-                        val clipText = if (hasClipItem) clipData!!.getItemAt(0).text?.toString() ?: "" else ""
-                        
-                        if (hasClipItem && clipText.isNotBlank()) {
-                            // Paste option
-                            DropdownMenuItem(onClick = {
-                                showContentMenu = false
-                                content = clipText
-                                Toast.makeText(context, "Pasted from clipboard", Toast.LENGTH_SHORT).show()
-                            }) {
-                                Row(verticalAlignment = Alignment.CenterVertically) {
-                                    Text("📎", fontSize = 16.sp)
-                                    Spacer(Modifier.width(8.dp))
-                                    Text("Paste")
-                                }
-                            }
-                            // Clipboard item preview
-                            DropdownMenuItem(onClick = {
-                                showContentMenu = false
-                                content = clipText
-                                Toast.makeText(context, "Pasted from clipboard", Toast.LENGTH_SHORT).show()
-                            }) {
-                                Row(verticalAlignment = Alignment.CenterVertically) {
-                                    Text("🗂️", fontSize = 16.sp)
-                                    Spacer(Modifier.width(8.dp))
-                                    Column {
-                                        Text("Clipboard", style = MaterialTheme.typography.body1)
+                        DropdownMenu(
+                            expanded = showClipMenu,
+                            onDismissRequest = { showClipMenu = false }
+                        ) {
+                            if (hasClip && clipText.isNotBlank()) {
+                                DropdownMenuItem(onClick = {
+                                    showClipMenu = false
+                                    content = clipText
+                                    Toast.makeText(context, "📎 Pasted from clipboard", Toast.LENGTH_SHORT).show()
+                                }) {
+                                    Column(modifier = Modifier.widthIn(max = 250.dp)) {
+                                        Text("Clipboard item", style = MaterialTheme.typography.subtitle2)
                                         Text(
-                                            clipText.take(50) + if (clipText.length > 50) "..." else "",
+                                            clipText.take(100) + if (clipText.length > 100) "..." else "",
                                             style = MaterialTheme.typography.caption,
-                                            color = MaterialTheme.colors.onSurface.copy(alpha = 0.5f),
-                                            maxLines = 1
+                                            color = MaterialTheme.colors.onSurface.copy(alpha = 0.6f),
+                                            maxLines = 3
                                         )
                                     }
                                 }
-                            }
-                        } else {
-                            // Clipboard empty indicator
-                            DropdownMenuItem(onClick = { showContentMenu = false }) {
-                                Row(verticalAlignment = Alignment.CenterVertically) {
-                                    Text("🗂️", fontSize = 16.sp)
-                                    Spacer(Modifier.width(8.dp))
-                                    Column {
-                                        Text("Clipboard", style = MaterialTheme.typography.body1)
-                                        Text(
-                                            "Empty",
-                                            style = MaterialTheme.typography.caption,
-                                            color = MaterialTheme.colors.onSurface.copy(alpha = 0.5f)
-                                        )
-                                    }
+                            } else {
+                                DropdownMenuItem(onClick = { showClipMenu = false }) {
+                                    Text("Clipboard is empty", color = MaterialTheme.colors.onSurface.copy(alpha = 0.5f))
                                 }
                             }
                         }
