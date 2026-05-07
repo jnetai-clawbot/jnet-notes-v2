@@ -336,6 +336,7 @@ fun NoteEditScreen(
                     singleLine = true
                 )
                 Spacer(modifier = Modifier.height(12.dp))
+
                 OutlinedTextField(
                     value = content,
                     onValueChange = { content = it },

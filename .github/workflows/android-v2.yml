@@ -18,9 +18,7 @@ jobs:
         with:
           java-version: '17'
           distribution: 'temurin'
-
-      - name: Clean Gradle cache
-        run: rm -rf ~/.gradle/caches/ || true
+          cache: gradle
 
       - name: Grant execute permission for gradlew
         run: chmod +x gradlew
