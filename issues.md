@@ -20,9 +20,17 @@ use same keystore so i can update the app without having to uninstall / reinstal
 
 use github workflows to make a new release in https://github.com/jnetai-clawbot/jnet-notes-v2
 
+Implement persistent error handling and debugging throughout the project. Every failure, exception, or unexpected state should generate a clear error code, detailed debug output, and useful diagnostic information to help identify the exact cause quickly.
+Do not remove debugging systems after issues are fixed — keep all error codes, logging, stack traces, validation checks, and diagnostic tools permanently integrated so that any future bugs, crashes, or unexpected behaviour can be traced and resolved efficiently.
+
+Implement persistent error handling and debugging throughout the project. Every failure, exception, or unexpected state should generate a clear error code, detailed debug output, and useful diagnostic information to help identify the exact cause quickly.
+Do not remove debugging systems after issues are fixed — keep all error codes, logging, stack traces, validation checks, and diagnostic tools permanently integrated so that any future bugs, crashes, or unexpected behaviour can be traced and resolved efficiently.
+
 Save changes to changes.txt (create if not exists)
 
-tell me when ready to test (stay quiet after acknowledging you got the message / request / mission every time and stay quiet till its ready to test response is fully complete! or if you need input from me or if I ask)!
+tell me when ready to test (stay quiet after acknowledging you got the message / request / mission every time and stay quiet till its ready to test and respond only if fully complete  or if you need input from me or if I ask for an update)!
+
+when giving final github release link make sure it points to the newest release but without the tag or filename so I can see the correct location without direct downloading the file as thats not good practice!
 
 
 
