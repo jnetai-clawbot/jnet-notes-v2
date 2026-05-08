@@ -14,7 +14,6 @@ import androidx.compose.material.*
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Clear
 import androidx.compose.material.icons.filled.Search
-import androidx.activity.compose.BackHandler
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -270,17 +269,6 @@ fun NoteEditScreen(
             }
             isLoading = false
         }
-    }
-
-    // Handle system back button
-    val backHandlerContext = context
-    BackHandler(enabled = noteId != null && (title != originalTitle || content != originalContent)) {
-        AlertDialog.Builder(backHandlerContext)
-            .setTitle("Discard changes?")
-            .setMessage("You have unsaved changes. Discard them?")
-            .setPositiveButton("Discard") { _, _ -> onCancel() }
-            .setNegativeButton("Keep editing", null)
-            .show()
     }
 
     if (showDeleteConfirm) {
