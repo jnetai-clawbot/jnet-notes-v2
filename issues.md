@@ -30,7 +30,7 @@ Save changes to changes.txt (create if not exists)
 
 tell me when ready to test (stay quiet after acknowledging you got the message / request / mission every time and stay quiet till its ready to test and respond only if fully complete  or if you need input from me or if I ask for an update)!
 
-when giving final github release link make sure it points to the newest release but without the tag or filename so I can see the correct location without direct downloading the file as thats not good practice!
+when giving final github release link make sure it points to the newest release but without the tag or filename so I can see the correct location without direct downloading the file as thats best practice!
 
 
 

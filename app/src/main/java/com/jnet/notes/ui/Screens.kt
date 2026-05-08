@@ -249,6 +249,7 @@ fun NoteEditScreen(
     var error by remember { mutableStateOf("") }
     var showDeleteConfirm by remember { mutableStateOf(false) }
     var showClipboardHistory by remember { mutableStateOf(false) }
+    var showContextMenu by remember { mutableStateOf(false) }
 
     if (noteId != null && isLoading) {
         LaunchedEffect(noteId) {
@@ -314,6 +315,11 @@ fun NoteEditScreen(
                             Text("Delete", color = MaterialTheme.colors.error)
                         }
                     }
+                    TextButton(onClick = { showContextMenu = true }) {
+                        Text("📋", color = Color.White)
+                    }
+                }
+            )
         }
     ) { paddingValues ->
         if (isLoading) {
@@ -393,6 +399,65 @@ fun NoteEditScreen(
                     }
                 }
 
+                // Context menu dialog (triggered by 📋 toolbar button)
+                if (showContextMenu) {
+                    AlertDialog(
+                        onDismissRequest = { showContextMenu = false },
+                        title = { Text("Options") },
+                        text = {
+                            Column {
+                                if (content.isNotEmpty()) {
+                                    TextButton(onClick = {
+                                        ClipboardHistory.push(content)
+                                        val cm = context.getSystemService(Context.CLIPBOARD_SERVICE) as android.content.ClipboardManager
+                                        cm.setPrimaryClip(android.content.ClipData.newPlainText("Note", content))
+                                        content = ""
+                                        showContextMenu = false
+                                        Toast.makeText(context, "Cut", Toast.LENGTH_SHORT).show()
+                                    }, modifier = Modifier.fillMaxWidth()) {
+                                        Text("✂️ Cut")
+                                    }
+                                    TextButton(onClick = {
+                                        ClipboardHistory.push(content)
+                                        val cm = context.getSystemService(Context.CLIPBOARD_SERVICE) as android.content.ClipboardManager
+                                        cm.setPrimaryClip(android.content.ClipData.newPlainText("Note", content))
+                                        showContextMenu = false
+                                        Toast.makeText(context, "Copied to clipboard", Toast.LENGTH_SHORT).show()
+                                    }, modifier = Modifier.fillMaxWidth()) {
+                                        Text("📋 Copy")
+                                    }
+                                    Divider()
+                                }
+                                TextButton(onClick = {
+                                    val cm = context.getSystemService(Context.CLIPBOARD_SERVICE) as android.content.ClipboardManager
+                                    val cd = cm.primaryClip
+                                    if (cd != null && cd.itemCount > 0) {
+                                        val pasted = cd.getItemAt(0).text?.toString() ?: ""
+                                        if (pasted.isNotBlank()) {
+                                            content += pasted
+                                            ClipboardHistory.push(pasted)
+                                        }
+                                    }
+                                    showContextMenu = false
+                                }, modifier = Modifier.fillMaxWidth()) {
+                                    Text("📎 Paste")
+                                }
+                                Divider()
+                                TextButton(onClick = {
+                                    showContextMenu = false
+                                    showClipboardHistory = true
+                                }, modifier = Modifier.fillMaxWidth()) {
+                                    Text("🗂️ Clipboard")
+                                }
+                            }
+                        },
+                        confirmButton = {
+                            TextButton(onClick = { showContextMenu = false }) {
+                                Text("Cancel")
+                            }
+                        }
+                    )
+                }
 
                 // Clipboard history dialog
                 if (showClipboardHistory) {
@@ -401,49 +466,34 @@ fun NoteEditScreen(
                         title = { Text("Clipboard") },
                         text = {
                             Column {
-                                // System clipboard item (most recent)
+                                // System clipboard
                                 val sysClip = (context.getSystemService(Context.CLIPBOARD_SERVICE) as android.content.ClipboardManager).primaryClip
                                 val sysText = if (sysClip != null && sysClip.itemCount > 0) sysClip.getItemAt(0).text?.toString() ?: "" else ""
-                            
                                 if (sysText.isNotBlank()) {
                                     Text("System Clipboard", style = MaterialTheme.typography.caption, color = MaterialTheme.colors.primary)
-                                    TextButton(
-                                        onClick = {
-                                            showClipboardHistory = false
-                                            content = sysText
-                                            ClipboardHistory.push(sysText)
-                                            Toast.makeText(context, "Pasted", Toast.LENGTH_SHORT).show()
-                                        },
-                                        modifier = Modifier.fillMaxWidth()
-                                    ) {
-                                        Text(
-                                            sysText.take(60).replace("\n", " ") + if (sysText.length > 60) "..." else "",
-                                            maxLines = 1
-                                        )
+                                    TextButton(onClick = {
+                                        showClipboardHistory = false
+                                        content = sysText
+                                        ClipboardHistory.push(sysText)
+                                        Toast.makeText(context, "Pasted", Toast.LENGTH_SHORT).show()
+                                    }, modifier = Modifier.fillMaxWidth()) {
+                                        Text(sysText.take(60).replace("\n", " ") + if (sysText.length > 60) "..." else "", maxLines = 1)
                                     }
                                     Divider()
                                 }
-                            
-                                // Local clipboard history
                                 if (ClipboardHistory.items.isEmpty()) {
                                     Text("No clipboard history yet.")
                                 } else {
                                     Text("App History", style = MaterialTheme.typography.caption, color = MaterialTheme.colors.primary)
                                     LazyColumn(modifier = Modifier.heightIn(max = 300.dp)) {
                                         items(ClipboardHistory.items) { item ->
-                                            TextButton(
-                                                onClick = {
-                                                    showClipboardHistory = false
-                                                    content = item
-                                                    ClipboardHistory.push(item)
-                                                    Toast.makeText(context, "Pasted", Toast.LENGTH_SHORT).show()
-                                                },
-                                                modifier = Modifier.fillMaxWidth()
-                                            ) {
-                                                Text(
-                                                    text = item.take(60).replace("\n", " ") + if (item.length > 60) "..." else "",
-                                                    maxLines = 1
-                                                )
+                                            TextButton(onClick = {
+                                                showClipboardHistory = false
+                                                content = item
+                                                ClipboardHistory.push(item)
+                                                Toast.makeText(context, "Pasted", Toast.LENGTH_SHORT).show()
+                                            }, modifier = Modifier.fillMaxWidth()) {
+                                                Text(text = item.take(60).replace("\n", " ") + if (item.length > 60) "..." else "", maxLines = 1)
                                             }
                                             Divider()
                                         }
@@ -840,4 +890,4 @@ fun SettingsScreen(
         }
     }
 }
-}
+
