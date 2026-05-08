@@ -14,6 +14,7 @@ import androidx.compose.material.*
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Clear
 import androidx.compose.material.icons.filled.Search
+import androidx.activity.compose.BackHandler
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -271,6 +272,17 @@ fun NoteEditScreen(
         }
     }
 
+    // Handle system back button
+    val backHandlerContext = context
+    BackHandler(enabled = noteId != null && (title != originalTitle || content != originalContent)) {
+        AlertDialog.Builder(backHandlerContext)
+            .setTitle("Discard changes?")
+            .setMessage("You have unsaved changes. Discard them?")
+            .setPositiveButton("Discard") { _, _ -> onCancel() }
+            .setNegativeButton("Keep editing", null)
+            .show()
+    }
+
     if (showDeleteConfirm) {
         AlertDialog(
             onDismissRequest = { showDeleteConfirm = false },
@@ -305,7 +317,19 @@ fun NoteEditScreen(
             TopAppBar(
                 title = { Text(if (noteId == null) "New Note" else "Edit Note") },
                 navigationIcon = {
-                    TextButton(onClick = onCancel) {
+                    TextButton(onClick = {
+                        // Confirm before closing if there are unsaved changes
+                        if (title != originalTitle || content != originalContent) {
+                            androidx.appcompat.app.AlertDialog.Builder(context)
+                                .setTitle("Discard changes?")
+                                .setMessage("You have unsaved changes. Discard them?")
+                                .setPositiveButton("Discard") { _, _ -> onCancel() }
+                                .setNegativeButton("Keep editing", null)
+                                .show()
+                        } else {
+                            onCancel()
+                        }
+                    }) {
                         Text("Close", color = Color.White)
                     }
                 },
@@ -515,8 +539,19 @@ fun NoteEditScreen(
 
                 Spacer(modifier = Modifier.height(8.dp))
 
-                // Share button only — clipboard moved to context menu
                 Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceEvenly) {
+                    OutlinedButton(
+                        onClick = {
+                            val cm = context.getSystemService(Context.CLIPBOARD_SERVICE) as android.content.ClipboardManager
+                            cm.setPrimaryClip(android.content.ClipData.newPlainText("Note", content))
+                            ClipboardHistory.push(content)
+                            Toast.makeText(context, "📋 Copied", Toast.LENGTH_SHORT).show()
+                        },
+                        modifier = Modifier.weight(1f).padding(horizontal = 4.dp)
+                    ) {
+                        Text("Copy")
+                    }
+
                     OutlinedButton(
                         onClick = {
                             val shareIntent = Intent().apply {
