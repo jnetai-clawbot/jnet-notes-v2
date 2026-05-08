@@ -251,6 +251,17 @@ fun NoteEditScreen(
     var showClipboardHistory by remember { mutableStateOf(false) }
     var showContextMenu by remember { mutableStateOf(false) }
 
+    // Handle system back button — ask to confirm close if unsaved changes
+    val backCtx = context
+    androidx.activity.compose.BackHandler(enabled = noteId != null && (title != originalTitle || content != originalContent)) {
+        androidx.appcompat.app.AlertDialog.Builder(backCtx)
+            .setTitle("Discard changes?")
+            .setMessage("You have unsaved changes. Discard them?")
+            .setPositiveButton("Discard") { _, _ -> onCancel() }
+            .setNegativeButton("Keep editing", null)
+            .show()
+    }
+
     if (noteId != null && isLoading) {
         LaunchedEffect(noteId) {
             try {
