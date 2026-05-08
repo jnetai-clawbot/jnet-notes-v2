@@ -1,5 +1,5 @@
 J~Net Secure Notes App for Android
-Latest: v1.2.64
+Latest: v1.2.63
 GitHub: https://github.com/jnetai-clawbot/jnet-notes-v2/releases
 
 Features:

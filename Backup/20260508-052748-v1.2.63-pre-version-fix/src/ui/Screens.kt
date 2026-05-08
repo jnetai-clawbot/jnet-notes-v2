@@ -31,7 +31,6 @@ import com.jnet.notes.data.local.NoteEntity
 import com.jnet.notes.data.local.UserCredsEntity
 import com.jnet.notes.data.local.UserDao
 import com.jnet.notes.security.EncryptionManager
-import com.jnet.notes.BuildConfig
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.setValue
 import kotlinx.coroutines.Dispatchers
@@ -43,8 +42,8 @@ import java.net.HttpURLConnection
 import java.net.URL
 
 private const val TAG = "JNetNotes"
-private const val GITHUB_API_URL = BuildConfig.GITHUB_API_URL
-private const val GITHUB_RELEASES_URL = BuildConfig.GITHUB_RELEASES_URL
+private const val GITHUB_API_URL = "https://api.github.com/repos/jnetai-clawbot/jnet-notes-v2/releases/latest"
+private const val GITHUB_RELEASES_URL = "https://github.com/jnetai-clawbot/jnet-notes-v2/releases"
 
 object Err {
     const val E001 = "E001: DB_INIT_FAILED"
@@ -899,6 +898,7 @@ fun LoginScreen(userDao: UserDao, onLoginSuccess: (String) -> Unit) {
 fun SettingsScreen(
     repository: NotesRepository,
     password: String,
+    currentVersion: String = "1.2.63",
     onBack: () -> Unit,
     onImportFile: () -> Unit = {},
     pendingImportJson: String? = null,
@@ -906,7 +906,6 @@ fun SettingsScreen(
     isDarkTheme: Boolean = true,
     onThemeToggle: (Boolean) -> Unit = {}
 ) {
-    val currentVersion = BuildConfig.VERSION_NAME
     val context = LocalContext.current
     val scope = rememberCoroutineScope()
     var statusMessage by remember { mutableStateOf("") }

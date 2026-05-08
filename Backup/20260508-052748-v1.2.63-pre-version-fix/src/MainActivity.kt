@@ -86,6 +86,7 @@ class MainActivity : ComponentActivity() {
                         SettingsScreen(
                             repository = repository,
                             password = unlockedPassword!!,
+                            currentVersion = "1.2.63",
                             onBack = { currentScreen = "list" },
                             onImportFile = { importFileLauncher.launch("*/*") },
                             pendingImportJson = pendingImportJson,
