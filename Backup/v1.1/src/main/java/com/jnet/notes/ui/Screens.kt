@@ -32,30 +32,6 @@ import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 import kotlinx.coroutines.launch
 
-
-/**
- * In-app clipboard history — stores items copied/cut for multi-item paste.
- * Android's ClipboardManager only exposes the most recent item.
- */
-object ClipboardHistory {
-    private val _items = mutableListOf<String>()
-    val items: List<String> get() = _items.toList()
-    private const val MAX_ITEMS = 10
-    
-    fun push(text: String) {
-        try {
-            if (text.isBlank()) return
-            if (_items.contains(text)) _items.remove(text)
-            _items.add(0, text)
-            while (_items.size > MAX_ITEMS) _items.removeAt(_items.lastIndex)
-        } catch (e: Exception) {
-            Log.e(TAG, "ClipboardHistory.push failed", e)
-        }
-    }
-    
-    fun clear() { _items.clear() }
-}
-
 private const val TAG = "JNetNotes"
 
 object Err {
@@ -250,7 +226,6 @@ fun NoteEditScreen(
     var isLoading by remember { mutableStateOf(noteId != null) }
     var error by remember { mutableStateOf("") }
     var showDeleteConfirm by remember { mutableStateOf(false) }
-    var showClipboardHistory by remember { mutableStateOf(false) }
 
     if (noteId != null && isLoading) {
         LaunchedEffect(noteId) {
@@ -306,23 +281,7 @@ fun NoteEditScreen(
             TopAppBar(
                 title = { Text(if (noteId == null) "New Note" else "Edit Note") },
                 navigationIcon = {
-                    TextButton(onClick = {
-                        try {
-                            if (title != originalTitle || content != originalContent) {
-                                androidx.appcompat.app.AlertDialog.Builder(context)
-                                    .setTitle("Discard changes?")
-                                    .setMessage("You have unsaved changes. Discard them?")
-                                    .setPositiveButton("Discard") { _, _ -> onCancel() }
-                                    .setNegativeButton("Keep editing", null)
-                                    .show()
-                            } else {
-                                onCancel()
-                            }
-                        } catch (e: Exception) {
-                            Log.e(TAG, "Back confirm dialog failed", e)
-                            onCancel()
-                        }
-                    }) {
+                    TextButton(onClick = onCancel) {
                         Text("Close", color = Color.White)
                     }
                 },
@@ -331,9 +290,6 @@ fun NoteEditScreen(
                         TextButton(onClick = { showDeleteConfirm = true }) {
                             Text("Delete", color = MaterialTheme.colors.error)
                         }
-                    }
-                    TextButton(onClick = { showClipboardHistory = true }) {
-                        Text("📋", color = Color.White)
                     }
                 }
             )
@@ -377,14 +333,6 @@ fun NoteEditScreen(
                             }
                             scope.launch {
                                 try {
-                                    if (title.isBlank()) {
-                                        withContext(Dispatchers.Main) { error = "Title cannot be empty" }
-                                        return@launch
-                                    }
-                                    if (content.isBlank()) {
-                                        withContext(Dispatchers.Main) { error = "Content cannot be empty" }
-                                        return@launch
-                                    }
                                     withContext(Dispatchers.IO) {
                                         if (noteId != null) {
                                             val notes = repository.getAllNotes()
@@ -425,16 +373,10 @@ fun NoteEditScreen(
                 Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceEvenly) {
                     OutlinedButton(
                         onClick = {
-                            try {
-                                val clipboard = context.getSystemService(Context.CLIPBOARD_SERVICE) as android.content.ClipboardManager
-                                val clip = android.content.ClipData.newPlainText("Note", content)
-                                clipboard.setPrimaryClip(clip)
-                                ClipboardHistory.push(content)
-                                Toast.makeText(context, "📋 Copied", Toast.LENGTH_SHORT).show()
-                            } catch (e: Exception) {
-                                Log.e(TAG, "Copy failed", e)
-                                Toast.makeText(context, "Copy failed: ${e.message}", Toast.LENGTH_SHORT).show()
-                            }
+                            val clipboard = context.getSystemService(Context.CLIPBOARD_SERVICE) as android.content.ClipboardManager
+                            val clip = android.content.ClipData.newPlainText("Note", content)
+                            clipboard.setPrimaryClip(clip)
+                            Toast.makeText(context, "Copied to clipboard", Toast.LENGTH_SHORT).show()
                         },
                         modifier = Modifier.weight(1f).padding(horizontal = 4.dp)
                     ) {
@@ -455,61 +397,6 @@ fun NoteEditScreen(
                     ) {
                         Text("Share")
                     }
-                }
-
-                // Clipboard history dialog
-                if (showClipboardHistory) {
-                    AlertDialog(
-                        onDismissRequest = { showClipboardHistory = false },
-                        title = { Text("Clipboard") },
-                        text = {
-                            Column {
-                                try {
-                                    val sysClip = (context.getSystemService(Context.CLIPBOARD_SERVICE) as android.content.ClipboardManager).primaryClip
-                                    val sysText = if (sysClip != null && sysClip.itemCount > 0) sysClip.getItemAt(0).text?.toString() ?: "" else ""
-                                    if (sysText.isNotBlank()) {
-                                        Text("System Clipboard", style = MaterialTheme.typography.caption, color = MaterialTheme.colors.primary)
-                                        TextButton(onClick = {
-                                            showClipboardHistory = false
-                                            content = sysText
-                                            ClipboardHistory.push(sysText)
-                                            Toast.makeText(context, "Pasted", Toast.LENGTH_SHORT).show()
-                                        }, modifier = Modifier.fillMaxWidth()) {
-                                            Text(sysText.take(60).replace("\n", " ") + if (sysText.length > 60) "..." else "", maxLines = 1)
-                                        }
-                                        Divider()
-                                    }
-                                } catch (e: Exception) {
-                                    Log.e(TAG, "Clipboard: failed to read system", e)
-                                }
-                                if (ClipboardHistory.items.isEmpty()) {
-                                    Text("No clipboard history yet.")
-                                } else {
-                                    Text("App History", style = MaterialTheme.typography.caption, color = MaterialTheme.colors.primary)
-                                    ClipboardHistory.items.forEach { item ->
-                                        TextButton(onClick = {
-                                            showClipboardHistory = false
-                                            content = item
-                                            ClipboardHistory.push(item)
-                                            Toast.makeText(context, "Pasted", Toast.LENGTH_SHORT).show()
-                                        }, modifier = Modifier.fillMaxWidth()) {
-                                            Text(item.take(60).replace("\n", " ") + if (item.length > 60) "..." else "", maxLines = 1)
-                                        }
-                                        Divider()
-                                    }
-                                }
-                                Spacer(modifier = Modifier.height(8.dp))
-                                TextButton(onClick = { ClipboardHistory.clear(); showClipboardHistory = false }) {
-                                    Text("Clear History", color = MaterialTheme.colors.error)
-                                }
-                            }
-                        },
-                        confirmButton = {
-                            TextButton(onClick = { showClipboardHistory = false }) {
-                                Text("Close")
-                            }
-                        }
-                    )
                 }
             }
         }
