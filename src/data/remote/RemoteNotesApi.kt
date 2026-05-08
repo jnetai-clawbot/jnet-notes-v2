@@ -1,7 +1,8 @@
 package com.jnet.notes.data.remote
 
+import retrofit2.Retrofit
+import retrofit2.converter.gson.GsonConverterFactory
 import retrofit2.http.*
-import retrofit2.Response
 
 data class NoteDto(val id: Int, val title: String, val content: String, val timestamp: Long)
 data class AuthResponse(val success: Boolean, val token: String, val message: String)
@@ -13,7 +14,7 @@ interface RemoteNotesApi {
         @Field("action") action: String = "login",
         @Field("username") username: String,
         @Field("password") password: String
-    ): Response<AuthResponse>
+    ): retrofit2.Response<AuthResponse>
 
     @FormUrlEncoded
     @POST("remote-notes.php")
@@ -22,11 +23,19 @@ interface RemoteNotesApi {
         @Field("token") token: String,
         @Field("title") title: String,
         @Field("content") content: String
-    ): Response<AuthResponse>
+    ): retrofit2.Response<AuthResponse>
 
     @GET("remote-notes.php")
     fun fetchNotes(
         @Query("action") action: String = "list",
         @Query("token") token: String
-    ): Response<List<NoteDto>>
+    ): retrofit2.Response<List<NoteDto>>
+}
+
+fun createApi(): RemoteNotesApi {
+    return Retrofit.Builder()
+        .baseUrl("https://jnetai.com/apps/Notes/")
+        .addConverterFactory(GsonConverterFactory.create())
+        .build()
+        .create(RemoteNotesApi::class.java)
 }

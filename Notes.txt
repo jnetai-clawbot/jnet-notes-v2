@@ -1,16 +1,15 @@
 J~Net Secure Notes App for Android
-https://github.com/jnetai-clawbot/jnet-notes-v2/releases/tag/v1.0.69
-
-Latest build: v1.2.64 (versionCode 64)
-Works on: Android 8.0+ (S8/S9 to Pixel 6/7/8)
+Latest: v1.2.63
+GitHub: https://github.com/jnetai-clawbot/jnet-notes-v2/releases
 
 Features:
-- ✅ Save & Revert buttons with icons
-- ✅ Full clipboard manager (system + history, tap to paste)
-- ✅ Copy / Cut / Paste / Select All context menu
-- ✅ Export/Import with cross-device encryption compatibility
-- ✅ About section with GitHub version + update checker
-- ✅ Dark/Light theme toggle
-- ✅ Encrypted local storage (AES-256-GCM)
-- ✅ Search by title or content
-- ✅ Remote sync via jnetai.com
+- Encrypted local storage (AES-256-GCM)
+- Password-protected with hash (not stored in plain text)
+- Save & Revert buttons
+- Full clipboard manager (system + history, tap to paste)
+- Copy / Cut / Paste / Clipboard Manager context menu
+- Export/Import with cross-device encryption
+- About section with GitHub version check
+- Dark/Light theme toggle
+- Search notes by title or content
+- Remote sync via jnetai.com

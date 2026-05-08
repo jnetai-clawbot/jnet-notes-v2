@@ -1,7 +1,6 @@
 package com.jnet.notes.security
 
 import java.security.SecureRandom
-import java.security.spec.PKCS5Spec
 import java.util.Base64
 import javax.crypto.Cipher
 import javax.crypto.SecretKeyFactory
@@ -15,7 +14,6 @@ object EncryptionManager {
     private const val SALT_SIZE = 16
     private const val ITERATIONS = 10000
 
-    // Hash password for authentication (stores hash, not password)
     fun hashPassword(password: String, salt: ByteArray): String {
         val spec = PBEKeySpec(password.toCharArray(), salt, ITERATIONS, AES_KEY_SIZE)
         val factory = SecretKeyFactory.getInstance("PBKDF2WithHmacSHA256")
@@ -29,7 +27,6 @@ object EncryptionManager {
         return salt
     }
 
-    // Derive a key from the password to encrypt/decrypt notes
     private fun deriveKey(password: String, salt: ByteArray): SecretKeySpec {
         val spec = PBEKeySpec(password.toCharArray(), salt, ITERATIONS, AES_KEY_SIZE)
         val factory = SecretKeyFactory.getInstance("PBKDF2WithHmacSHA256")
@@ -42,32 +39,24 @@ object EncryptionManager {
         val iv = ByteArray(IV_SIZE)
         SecureRandom().nextBytes(iv)
         val spec = GCMParameterSpec(128, iv)
-        
         cipher.init(Cipher.ENCRYPT_MODE, key, spec)
         val encrypted = cipher.doFinal(plaintext.toByteArray(Charsets.UTF_8))
-        
-        // Combine IV and Ciphertext for storage: [IV(12b)][Ciphertext]
         val combined = ByteArray(iv.size + encrypted.size)
         System.arraycopy(iv, 0, combined, 0, iv.size)
         System.arraycopy(encrypted, 0, combined, iv.size, encrypted.size)
-        
         return Base64.getEncoder().encodeToString(combined)
     }
 
     fun decrypt(encryptedBase64: String, password: String, salt: ByteArray): String {
         val combined = Base64.getDecoder().decode(encryptedBase64)
         val key = deriveKey(password, salt)
-        
         val iv = ByteArray(IV_SIZE)
         System.arraycopy(combined, 0, iv, 0, IV_SIZE)
-        
         val ciphertext = ByteArray(combined.size - IV_SIZE)
         System.arraycopy(combined, IV_SIZE, ciphertext, 0, ciphertext.size)
-        
         val cipher = Cipher.getInstance("AES/GCM/NoPadding")
         val spec = GCMParameterSpec(128, iv)
         cipher.init(Cipher.DECRYPT_MODE, key, spec)
-        
         return String(cipher.doFinal(ciphertext), Charsets.UTF_8)
     }
 }
