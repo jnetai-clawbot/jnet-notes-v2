@@ -1,4 +1,3 @@
-private const val TAG = "JNetNotes"
 
 package com.jnet.notes.security
 
@@ -11,6 +10,7 @@ import javax.crypto.SecretKeyFactory
 import javax.crypto.spec.GCMParameterSpec
 import javax.crypto.spec.PBEKeySpec
 import javax.crypto.spec.SecretKeySpec
+private const val TAG = "JNetNotes"
 
 object EncryptionManager {
     private const val AES_KEY_SIZE = 256
