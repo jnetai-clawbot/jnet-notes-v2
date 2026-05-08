@@ -2,6 +2,7 @@
 package com.jnet.notes.security
 
 import android.util.Log
+import java.nio.charset.Charsets
 
 import java.security.SecureRandom
 import java.util.Base64
