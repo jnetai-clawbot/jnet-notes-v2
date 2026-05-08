@@ -906,7 +906,7 @@ fun SettingsScreen(
     isDarkTheme: Boolean = true,
     onThemeToggle: (Boolean) -> Unit = {}
 ) {
-    val currentVersion = BuildConfig.VERSION_NAME(context)
+    val currentVersion = BuildConfig.VERSION_NAME
     val context = LocalContext.current
     val scope = rememberCoroutineScope()
     var statusMessage by remember { mutableStateOf("") }
